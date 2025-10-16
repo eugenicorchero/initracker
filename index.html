@@ -249,7 +249,7 @@
                 <transition-group name="slide-fade" tag="div" class="space-y-4 md:space-y-6">
                     <div v-for="(c, index) in sortedCombatants" :key="c.id" :id="'combatant-' + c.id"
                     :class="{'combatant-active shadow-2xl': index === activeCombatantIndex, 'dragging': c.isDragging, 'drag-over': c.isDragOver}"
-                    class="bg-gray-800 mobile-compact md:p-5 rounded-2xl grid gap-4 md:gap-5 md:grid-cols-12 items-start transition-all duration-300 cursor-move"
+                    class="bg-gray-800 mobile-compact md:p-4 rounded-2xl border border-gray-700 transition-all duration-300 cursor-move flex flex-col md:flex-row md:items-stretch gap-2 md:gap-3"
                     :data-index="index"
                     draggable="true"
                     @dragstart="startDrag($event, c)"
@@ -260,87 +260,80 @@
 
                     <!-- 2.1 Info Básica (Nombre, CA, Iniciativa) -->
                     <div class="w-full md:col-span-3">
-                        <div class="flex items-center justify-between md:block">
+                        <div class="flex flex-col gap-2 items-start justify-start">
                             <span class="text-base md:text-lg font-bold"
                                 :class="{'text-blue-400': c.isPlayer, 'text-red-400': !c.isPlayer}">{{ c.name }}</span>
                             <span v-if="index === activeCombatantIndex" class="md:hidden bg-yellow-500 text-gray-900 px-2 py-1 rounded-full text-xs font-bold">
                                 ACTIVO
                             </span>
-                        </div>
-                        <div class="text-sm text-gray-400 space-x-2 mt-1 flex flex-wrap gap-1">
-                            <span class="inline-block px-2 py-1 bg-gray-700 rounded-full">CA: {{ c.ac }}</span>
-                            <span class="inline-block px-2 py-1 bg-gray-700 rounded-full">Init: {{ c.initiative }}</span>
+                            <div class="flex gap-2 mt-1">
+                                <span class="inline-block px-2 py-1 bg-gray-700 rounded-full">CA: {{ c.ac }}</span>
+                                <span class="inline-block px-2 py-1 bg-gray-700 rounded-full">Init: {{ c.initiative }}</span>
+                            </div>
                         </div>
                     </div>
 
                     <!-- 2.2 Control de HP (Barra de Vida) -->
                     <div class="w-full md:col-span-6">
-                        <div class="relative pt-1">
-                            <div class="flex mb-2 items-center justify-between">
-                                <span class="text-sm font-semibold inline-block py-1 px-2 uppercase rounded-full"
+                        <div class="flex flex-col gap-1 w-full">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-base font-semibold py-1 px-3 uppercase rounded-full"
                                     :class="hpColorClass(c)">
                                     HP: {{ c.currentHp }}{{ c.tempHp > 0 ? `+${c.tempHp}` : '' }} / {{ c.maxHp }}
                                 </span>
                                 <div v-if="c.currentHp === 0 && c.isPlayer" class="flex space-x-1">
                                     <button @click="rollDeathSave(c, true)" title="Éxito en salvación de muerte"
-                                        class="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs">
+                                        class="px-2 py-1 bg-green-600 hover:bg-green-700 rounded-full text-xs">
                                         ✓{{ c.deathSaves.successes }}
                                     </button>
                                     <button @click="rollDeathSave(c, false)" title="Fallo en salvación de muerte"
-                                        class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs">
+                                        class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded-full text-xs">
                                         ✗{{ c.deathSaves.failures }}
                                     </button>
                                 </div>
                             </div>
-                            <!-- Barra de vida visual con HP temporal -->
                             <div class="overflow-hidden h-3 mb-4 text-xs flex rounded-full bg-red-900">
-                                <!-- HP actual -->
                                 <div :style="{ width: hpPercentage(c) + '%' }"
                                     class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500"
                                     :class="hpBarClass(c)">
                                 </div>
-                                <!-- HP temporal (si existe) -->
                                 <div v-if="c.tempHp > 0" :style="{ width: tempHpPercentage(c) + '%' }"
                                     class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 bg-blue-400">
                                 </div>
                             </div>
-                        </div>
-                        <!-- Controles Rápidos de HP -->
-                        <div class="flex flex-wrap items-center gap-4 md:gap-6 text-sm py-2">
-                            <input type="number" v-model.number="c.damageInput" placeholder="Cantidad" min="1"
-                                class="touch-target w-28 md:w-36 p-2 rounded bg-gray-700 text-center text-gray-100 focus:ring-yellow-500 focus:border-yellow-500">
-                            <button @click="showDamageRoller(c)" title="Tirar dados de daño/curación"
-                                class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm font-bold transition duration-150">
-                                🎲
-                            </button>
-                            <button @click="adjustHp(c, -c.damageInput)"
-                                :disabled="!c.damageInput || c.damageInput <= 0"
-                                class="touch-target px-4 py-2 bg-red-700 hover:bg-red-800 active:bg-red-900 rounded font-bold disabled:opacity-50 transition duration-150"
-                                title="Restar HP (-)">
-                                -
-                            </button>
-                            <button @click="adjustHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
-                                class="touch-target px-4 py-2 bg-green-700 hover:bg-green-800 active:bg-green-900 rounded font-bold disabled:opacity-50 transition duration-150"
-                                title="Sumar HP (+)">
-                                +
-                            </button>
-                            <button @click="adjustTempHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
-                                class="touch-target px-4 py-2 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 rounded font-medium disabled:opacity-50 transition duration-150"
-                                title="Añadir HP Temporal">
-                                Temp
-                            </button>
-                            <button @click="undoHpChange(c)" :disabled="!c.hpHistory || c.hpHistory.length === 0"
-                                class="touch-target px-4 py-2 bg-yellow-700 hover:bg-yellow-800 active:bg-yellow-900 rounded font-medium disabled:opacity-50 transition duration-150"
-                                title="Deshacer último cambio de HP">
-                                ↶
-                            </button>
+                            <!-- HP Controls Container -->
+                            <div class="flex flex-wrap gap-3 md:gap-4 items-center justify-start bg-gray-900/80 rounded-xl p-3 mt-2 w-full">
+                                <input type="number" v-model.number="c.damageInput" placeholder="Cantidad" min="1"
+                                    class="touch-target w-20 md:w-24 p-2 rounded-lg bg-gray-700 text-center text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" style="min-width:60px;max-width:100px;">
+                                <button @click="adjustHp(c, -c.damageInput)"
+                                    :disabled="!c.damageInput || c.damageInput <= 0"
+                                    class="w-10 h-10 flex items-center justify-center bg-red-700 hover:bg-red-800 active:bg-red-900 rounded-lg text-xl font-bold disabled:opacity-50 transition duration-150 shadow-md" aria-label="Restar HP (-)"
+                                    title="Restar HP (-)">
+                                    -
+                                </button>
+                                <button @click="adjustHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
+                                    class="w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-800 active:bg-green-900 rounded-lg text-xl font-bold disabled:opacity-50 transition duration-150 shadow-md" aria-label="Sumar HP (+)"
+                                    title="Sumar HP (+)">
+                                    +
+                                </button>
+                                <button @click="adjustTempHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
+                                    class="w-10 h-10 flex items-center justify-center bg-blue-700 hover:bg-blue-800 active:bg-blue-900 rounded-lg text-base font-medium disabled:opacity-50 transition duration-150 shadow-md" aria-label="Añadir HP Temporal"
+                                    title="Añadir HP Temporal">
+                                    Temp
+                                </button>
+                                <button @click="undoHpChange(c)" :disabled="!c.hpHistory || c.hpHistory.length === 0"
+                                    class="w-10 h-10 flex items-center justify-center bg-yellow-700 hover:bg-yellow-800 active:bg-yellow-900 rounded-lg text-lg font-medium disabled:opacity-50 transition duration-150 shadow-md" aria-label="Deshacer último cambio de HP"
+                                    title="Deshacer último cambio de HP">
+                                    ↶
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <!-- 2.3 Condiciones y Notas -->
                     <div class="w-full md:col-span-3 mt-2 md:mt-0 space-y-3">
                         <!-- FILA DE CONDICIONES -->
-                        <div class="flex space-x-1 flex-wrap justify-start items-center gap-1">
+                        <div class="flex flex-wrap gap-2 items-center mt-2">
                             <!-- Iconos de Condiciones -->
                             <div v-for="cond in c.conditions" :key="cond.name + cond.id" 
                                 class="relative group m-0.5 transition duration-150"
@@ -398,9 +391,10 @@
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                             <input type="text" v-model="c.notes" @input="saveCombatants"
                                 placeholder="Notas (Ej: Carga, Bendecido, etc.)"
-                                class="touch-target flex-grow p-2 sm:p-1 text-sm rounded bg-gray-700 text-gray-100 focus:ring-yellow-500 focus:border-yellow-500">
+                                class="touch-target flex-grow p-1 text-base rounded bg-gray-700 text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" style="min-width:80px;">
                             <button @click="removeCombatant(c.id)"
-                                class="touch-target px-3 py-2 sm:py-1 bg-red-900 hover:bg-red-800 active:bg-red-700 rounded text-xs font-semibold transition duration-150">
+                                class="touch-target px-3 py-1 bg-red-900 hover:bg-red-800 active:bg-red-700 rounded text-base font-semibold transition duration-150" style="min-width:60px;"
+                                title="Eliminar combatiente">
                                 Eliminar
                             </button>
                         </div>
@@ -424,24 +418,22 @@
                     </div>
                     <div class="grid grid-cols-3 gap-3">
                         <!-- INICIATIVA CON TIRADA ALEATORIA -->
-                        <div class="col-span-1">
+                        <div class="col-span-1 flex flex-col gap-2">
                             <label for="combatant-init"
                                 class="block text-sm font-medium text-gray-300">Iniciativa</label>
-                            <div class="flex items-center space-x-2">
+                            <div class="flex items-center gap-2">
                                 <input id="combatant-init" type="number" v-model.number="newCombatant.initiative"
                                     placeholder="10"
-                                    class="flex-grow p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
+                                    class="flex-grow p-2 rounded-lg bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
                                     min="0">
-                                <div class="flex space-x-1">
-                                    <button @click="rollInitiative" title="Tirada Rápida de Iniciativa (1d20+10)"
-                                        class="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-gray-900 font-bold transition duration-150 flex-shrink-0 shadow-md">
-                                        🎲
-                                    </button>
-                                    <button @click="rollInitiativeCustom" title="Tirada Personalizada"
-                                        class="p-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-gray-900 font-bold transition duration-150 flex-shrink-0 shadow-md text-xs">
-                                        +
-                                    </button>
-                                </div>
+                                <button @click="rollInitiative" title="Tirar iniciativa (1d20+10)"
+                                    class="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 rounded-full text-lg font-bold transition duration-150 shadow-md">
+                                    🎲
+                                </button>
+                                <button @click="rollInitiativeCustom" title="Tirada personalizada"
+                                    class="w-10 h-10 flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 rounded-full text-base font-bold transition duration-150 shadow-md">
+                                    +
+                                </button>
                             </div>
                         </div>
                         <!-- HP MÁX Y CA -->
