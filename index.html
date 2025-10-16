@@ -249,7 +249,7 @@
                 <transition-group name="slide-fade" tag="div" class="space-y-4 md:space-y-6">
                     <div v-for="(c, index) in sortedCombatants" :key="c.id" :id="'combatant-' + c.id"
                     :class="{'combatant-active shadow-2xl': index === activeCombatantIndex, 'dragging': c.isDragging, 'drag-over': c.isDragOver}"
-                    class="bg-gray-800 mobile-compact md:p-4 rounded-2xl border border-gray-700 transition-all duration-300 cursor-move flex flex-col md:flex-row md:items-stretch gap-2 md:gap-3"
+                    class="bg-gray-800 p-3 rounded-2xl border border-gray-700 transition-all duration-300 cursor-move flex flex-col gap-2 w-full max-w-2xl mx-auto"
                     :data-index="index"
                     draggable="true"
                     @dragstart="startDrag($event, c)"
@@ -303,29 +303,31 @@
                             </div>
                             <!-- HP Controls Container -->
                             <div class="flex flex-wrap gap-3 md:gap-4 items-center justify-start bg-gray-900/80 rounded-xl p-3 mt-2 w-full">
-                                <input type="number" v-model.number="c.damageInput" placeholder="Cantidad" min="1"
-                                    class="touch-target w-20 md:w-24 p-2 rounded-lg bg-gray-700 text-center text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" style="min-width:60px;max-width:100px;">
-                                <button @click="adjustHp(c, -c.damageInput)"
-                                    :disabled="!c.damageInput || c.damageInput <= 0"
-                                    class="w-10 h-10 flex items-center justify-center bg-red-700 hover:bg-red-800 active:bg-red-900 rounded-lg text-xl font-bold disabled:opacity-50 transition duration-150 shadow-md" aria-label="Restar HP (-)"
-                                    title="Restar HP (-)">
-                                    -
-                                </button>
-                                <button @click="adjustHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
-                                    class="w-10 h-10 flex items-center justify-center bg-green-700 hover:bg-green-800 active:bg-green-900 rounded-lg text-xl font-bold disabled:opacity-50 transition duration-150 shadow-md" aria-label="Sumar HP (+)"
-                                    title="Sumar HP (+)">
-                                    +
-                                </button>
-                                <button @click="adjustTempHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
-                                    class="w-10 h-10 flex items-center justify-center bg-blue-700 hover:bg-blue-800 active:bg-blue-900 rounded-lg text-base font-medium disabled:opacity-50 transition duration-150 shadow-md" aria-label="Añadir HP Temporal"
-                                    title="Añadir HP Temporal">
-                                    Temp
-                                </button>
-                                <button @click="undoHpChange(c)" :disabled="!c.hpHistory || c.hpHistory.length === 0"
-                                    class="w-10 h-10 flex items-center justify-center bg-yellow-700 hover:bg-yellow-800 active:bg-yellow-900 rounded-lg text-lg font-medium disabled:opacity-50 transition duration-150 shadow-md" aria-label="Deshacer último cambio de HP"
-                                    title="Deshacer último cambio de HP">
-                                    ↶
-                                </button>
+                                <div class="flex flex-row gap-2 items-center w-full justify-start">
+                                    <input type="number" v-model.number="c.damageInput" placeholder="Cantidad" min="1"
+                                        class="touch-target w-16 p-1 rounded bg-gray-700 text-center text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" style="min-width:50px;max-width:80px;">
+                                    <button @click="adjustHp(c, -c.damageInput)"
+                                        :disabled="!c.damageInput || c.damageInput <= 0"
+                                        class="w-9 h-9 flex items-center justify-center bg-red-700 hover:bg-red-800 active:bg-red-900 rounded-full text-lg font-bold disabled:opacity-50 transition duration-150 shadow-md" aria-label="Restar HP (-)"
+                                        title="Restar HP (-)">
+                                        -
+                                    </button>
+                                    <button @click="adjustHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
+                                        class="w-9 h-9 flex items-center justify-center bg-green-700 hover:bg-green-800 active:bg-green-900 rounded-full text-lg font-bold disabled:opacity-50 transition duration-150 shadow-md" aria-label="Sumar HP (+)"
+                                        title="Sumar HP (+)">
+                                        +
+                                    </button>
+                                    <button @click="adjustTempHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
+                                        class="w-9 h-9 flex items-center justify-center bg-blue-700 hover:bg-blue-800 active:bg-blue-900 rounded-full text-base font-medium disabled:opacity-50 transition duration-150 shadow-md" aria-label="Añadir HP Temporal"
+                                        title="Añadir HP Temporal">
+                                        Temp
+                                    </button>
+                                    <button @click="undoHpChange(c)" :disabled="!c.hpHistory || c.hpHistory.length === 0"
+                                        class="w-9 h-9 flex items-center justify-center bg-yellow-700 hover:bg-yellow-800 active:bg-yellow-900 rounded-full text-base font-medium disabled:opacity-50 transition duration-150 shadow-md" aria-label="Deshacer último cambio de HP"
+                                        title="Deshacer último cambio de HP">
+                                        ↶
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -352,7 +354,7 @@
                                         }">
                                         {{ cond.icon }}
                                         <span v-if="cond.duration && cond.duration !== '∞'"
-                                            class="ml-0.5 text-sm font-extrabold">{{ cond.duration }}</span>
+                                            class="ml-0.5 text-sm font-extrabold">t{{ cond.duration }}</span>
                                         <span v-if="cond.saveRequired" class="ml-0.5 text-xs">💾</span>
                                     </span>
                                 </div>
@@ -362,7 +364,7 @@
                                     <span class="font-bold block mb-1 text-base">
                                         {{ cond.name }} 
                                         <span v-if="cond.saveDC" class="text-sm">(CD {{ cond.saveDC }})</span>
-                                        (Dur: {{ cond.duration === '∞' ? 'Especial' : cond.duration + ' Rondas' }})
+                                        (T: {{ cond.duration === '∞' ? '∞' : cond.duration }} turnos)
                                     </span>
                                     <p class="text-left text-gray-300">{{ getConditionTooltip(cond.name) }}</p>
                                     <div v-if="cond.saveRequired" class="mt-2 pt-2 border-t border-gray-600">
@@ -389,14 +391,16 @@
 
                         <!-- NOTAS y BOTÓN ELIMINAR -->
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                            <input type="text" v-model="c.notes" @input="saveCombatants"
-                                placeholder="Notas (Ej: Carga, Bendecido, etc.)"
-                                class="touch-target flex-grow p-1 text-base rounded bg-gray-700 text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" style="min-width:80px;">
-                            <button @click="removeCombatant(c.id)"
-                                class="touch-target px-3 py-1 bg-red-900 hover:bg-red-800 active:bg-red-700 rounded text-base font-semibold transition duration-150" style="min-width:60px;"
-                                title="Eliminar combatiente">
-                                Eliminar
-                            </button>
+                            <div class="flex flex-row gap-2 w-full mt-1">
+                                <input type="text" v-model="c.notes" @input="saveCombatants"
+                                    placeholder="Notas (Ej: Carga, Bendecido, etc.)"
+                                    class="touch-target flex-grow p-1 text-base rounded bg-gray-700 text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" style="min-width:60px;">
+                                <button @click="removeCombatant(c.id)"
+                                    class="touch-target px-3 py-1 bg-red-900 hover:bg-red-800 active:bg-red-700 rounded text-base font-semibold transition duration-150" style="min-width:50px;"
+                                    title="Eliminar combatiente">
+                                    Eliminar
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -410,55 +414,52 @@
                 <!-- 3. Formulario para Añadir Combatiente -->
                 <div class="bg-gray-800 p-4 rounded-xl shadow-xl space-y-4">
                     <h3 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-3">➕ Añadir Combatiente</h3>
-                    <div>
+                    <div class="flex flex-col gap-2">
                         <label for="combatant-name" class="block text-sm font-medium text-gray-300">Nombre</label>
                         <input id="combatant-name" type="text" v-model="newCombatant.name"
                             placeholder="Ej: Kael (Guerrero) o Goblin 3"
                             class="w-full p-2 rounded bg-gray-700 focus:ring-yellow-500 focus:border-yellow-500">
                     </div>
-                    <div class="grid grid-cols-3 gap-3">
-                        <!-- INICIATIVA CON TIRADA ALEATORIA -->
-                        <div class="col-span-1 flex flex-col gap-2">
-                            <label for="combatant-init"
-                                class="block text-sm font-medium text-gray-300">Iniciativa</label>
-                            <div class="flex items-center gap-2">
+                    <div class="flex flex-row gap-2 mt-2">
+                        <div class="flex flex-col gap-1 w-1/3">
+                            <label for="combatant-init" class="block text-sm font-medium text-gray-300">Iniciativa</label>
+                            <div class="flex gap-1">
                                 <input id="combatant-init" type="number" v-model.number="newCombatant.initiative"
                                     placeholder="10"
-                                    class="flex-grow p-2 rounded-lg bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
+                                    class="w-full p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
                                     min="0">
                                 <button @click="rollInitiative" title="Tirar iniciativa (1d20+10)"
-                                    class="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 rounded-full text-lg font-bold transition duration-150 shadow-md">
+                                    class="w-8 h-8 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 rounded-full text-base font-bold transition duration-150 shadow-md">
                                     🎲
                                 </button>
                                 <button @click="rollInitiativeCustom" title="Tirada personalizada"
-                                    class="w-10 h-10 flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 rounded-full text-base font-bold transition duration-150 shadow-md">
+                                    class="w-8 h-8 flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 rounded-full text-base font-bold transition duration-150 shadow-md">
                                     +
                                 </button>
                             </div>
                         </div>
-                        <!-- HP MÁX Y CA -->
-                        <div>
+                        <div class="flex flex-col gap-1 w-1/3">
                             <label for="combatant-maxhp" class="block text-sm font-medium text-gray-300">HP Máx.</label>
                             <input id="combatant-maxhp" type="number" v-model.number="newCombatant.maxHp"
                                 placeholder="35"
                                 class="w-full p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
                                 min="1">
                         </div>
-                        <div>
+                        <div class="flex flex-col gap-1 w-1/3">
                             <label for="combatant-ac" class="block text-sm font-medium text-gray-300">CA</label>
                             <input id="combatant-ac" type="number" v-model.number="newCombatant.ac" placeholder="15"
                                 class="w-full p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
                                 min="0">
                         </div>
                     </div>
-                    <div class="flex items-center space-x-2 pt-2">
+                    <div class="flex items-center gap-2 pt-2">
                         <input type="checkbox" id="isPlayerCheckbox" v-model="newCombatant.isPlayer"
                             class="h-4 w-4 rounded text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500">
                         <label for="isPlayerCheckbox" class="text-gray-300 select-none">¿Es un Jugador?</label>
                     </div>
                     <button @click="addCombatant"
                         :disabled="!newCombatant.name || !newCombatant.maxHp || newCombatant.maxHp <= 0"
-                        class="w-full p-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition duration-150 disabled:opacity-50 shadow-md">
+                        class="w-full mt-3 p-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition duration-150 disabled:opacity-50 shadow-md">
                         Añadir a la Batalla
                     </button>
                 </div>
@@ -531,7 +532,7 @@
                         <!-- Duración solo para condiciones no permanentes (y no Concentración) -->
                         <div v-if="cond.name !== 'Concentración'"
                             class="flex items-center mt-2 space-x-2 border-t border-gray-600 pt-2">
-                            <label :for="'dur-' + cond.name" class="text-sm text-gray-300">Duración (Rondas):</label>
+                            <label :for="'dur-' + cond.name" class="text-sm text-gray-300">Duración (Turnos):</label>
                             <input :id="'dur-' + cond.name" type="number" min="1" v-model.number="cond.customDuration"
                                 placeholder="1" class="w-16 p-1 text-sm rounded bg-gray-800 text-center">
                         </div>
@@ -783,6 +784,28 @@
 
         <!-- 
             ==============================================
+            POPUP: CONFIRMAR CONDICIÓN EXPIRADA
+            ==============================================
+        -->
+        <div v-if="expiringConditionPopup && expiringConditionPopup.isVisible"
+            class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-5 rounded-xl w-full max-w-sm shadow-2xl border border-yellow-500">
+                <h3 class="text-xl font-semibold mb-2 text-yellow-300">Condición expirada</h3>
+                <p class="text-gray-100 mb-4">
+                    ¿La condición <span class="font-bold">{{ expiringConditionPopup.condition?.name }}</span> en
+                    <span class="font-bold">{{ expiringConditionPopup.combatant?.name }}</span> ha terminado?
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button @click="handleExpiringCondition(true)"
+                        class="px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold">Sí, eliminar</button>
+                    <button @click="handleExpiringCondition(false)"
+                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold">No, mantener</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
             TOAST / ALERTA DE MENSAJE (CENTRADO EN PANTALLA)
             ==============================================
         -->
@@ -803,7 +826,7 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, watch, nextTick } = Vue
+    const { createApp, ref, computed, watch, nextTick } = Vue
 
         // Definiciones de condiciones oficiales (Reglas Básicas de D&D)
         const CONDITION_DEFINITIONS = {
@@ -835,6 +858,13 @@
 
         const app = createApp({
             setup() {
+                // Popup + queue for expiring conditions (per-turn start)
+                const expiringConditionPopup = ref({
+                    isVisible: false,
+                    combatant: null,
+                    condition: null
+                });
+                const expiringQueue = ref([]); // items: { combatantId, conditionId }
                 // Estado persistente
                 const combatants = ref(JSON.parse(localStorage.getItem('dnd_combatants')) || []);
                 const round = ref(parseInt(localStorage.getItem('dnd_round')) || 1);
@@ -1317,32 +1347,17 @@
                         stopTimer();
                     }
 
-                    // 1. Aplicar efectos de fin de turno (decremento de duración de condiciones)
-                    const currentCombatant = sortedCombatants.value[activeCombatantIndex.value];
-                    if (currentCombatant) {
-                        // Solo decrementa si la duración NO es '∞'
-                        currentCombatant.conditions = currentCombatant.conditions.filter(cond => {
-                            if (cond.duration && cond.duration !== '∞' && !isNaN(cond.duration) && cond.duration > 0) {
-                                cond.duration--;
-                                // Si la condición expira, se notifica
-                                if (cond.duration === 0) {
-                                    showToast("Condición Expirada", `${currentCombatant.name} ya no está ${cond.name}.`, 'info', 3000);
-                                }
-                                return cond.duration > 0;
-                            }
-                            // Mantiene las condiciones permanentes ('∞') y la concentración (que es '∞')
-                            return true;
-                        });
-                    }
-
-                    // 2. Avanzar el índice activo
+                    // 1. Advance active combatant index
                     activeCombatantIndex.value++;
 
-                    // 3. Comprobar si se completa la ronda
+                    // 2. If wrapped, it's a new round
                     if (activeCombatantIndex.value >= sortedCombatants.value.length) {
                         activeCombatantIndex.value = 0;
                         round.value++;
                     }
+
+                    // 3. Process start-of-turn effects for the NEW active combatant
+                    processStartOfTurn();
 
                     // 4. Scroll to the new active combatant
                     scrollToActiveCombatant();
@@ -1353,6 +1368,67 @@
                             startTimer();
                         });
                     }
+                };
+
+                // Start-of-turn processing: decrement own-round conditions and queue expirations
+                const processStartOfTurn = () => {
+                    const current = sortedCombatants.value[activeCombatantIndex.value];
+                    if (!current || !current.conditions) return;
+
+                    const expiredNow = [];
+                    current.conditions.forEach(cond => {
+                        if (cond.duration && cond.duration !== '∞' && !isNaN(cond.duration) && cond.duration > 0) {
+                            cond.duration--;
+                            if (cond.duration === 0) {
+                                expiredNow.push(cond);
+                            }
+                        }
+                    });
+
+                    expiredNow.forEach(cond => {
+                        expiringQueue.value.push({ combatantId: current.id, conditionId: cond.id });
+                    });
+
+                    showNextExpiring();
+                };
+
+                const showNextExpiring = () => {
+                    if (expiringConditionPopup.value.isVisible) return; // Already showing one
+                    while (expiringQueue.value.length > 0) {
+                        const next = expiringQueue.value.shift();
+                        const c = combatants.value.find(x => x.id === next.combatantId);
+                        if (!c) continue;
+                        const cond = c.conditions.find(cc => cc.id === next.conditionId);
+                        if (!cond) continue;
+                        expiringConditionPopup.value = {
+                            isVisible: true,
+                            combatant: c,
+                            condition: cond
+                        };
+                        break;
+                    }
+                };
+
+                // Handler for expiring condition popup
+                const handleExpiringCondition = (isFinished) => {
+                    const { combatant, condition } = expiringConditionPopup.value;
+                    if (combatant && condition) {
+                        if (isFinished) {
+                            // Remove by id to avoid name collisions
+                            const c = combatants.value.find(x => x.id === combatant.id);
+                            if (c) {
+                                c.conditions = c.conditions.filter(co => co.id !== condition.id);
+                            }
+                            showToast("Condición Eliminada", `${combatant.name} ya no está ${condition.name}.`, 'info', 3000);
+                        } else {
+                            // Keep until next start of this creature's turn
+                            condition.duration = 1;
+                            showToast("Condición Mantiene", `${combatant.name} mantiene ${condition.name} hasta su próximo turno.`, 'info', 3000);
+                        }
+                    }
+                    expiringConditionPopup.value.isVisible = false;
+                    // Show next in queue if any
+                    nextTick(() => showNextExpiring());
                 };
 
                 const resetCombat = () => {
@@ -1870,7 +1946,9 @@
                     // UI/UX Enhancements
                     isDarkTheme, isKeyboardShortcutsOpen, keyboardShortcuts,
                     toggleTheme, showKeyboardShortcuts, startDrag, endDrag, dragOver, dragLeave, drop,
-                    exportCombatants, importCombatants
+                    exportCombatants, importCombatants,
+                    // Expiring condition popup
+                    expiringConditionPopup, handleExpiringCondition
                 }
             }
         })
