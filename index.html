@@ -354,7 +354,7 @@
                                         }">
                                         {{ cond.icon }}
                                         <span v-if="cond.duration && cond.duration !== '∞'"
-                                            class="ml-0.5 text-sm font-extrabold">t{{ cond.duration }}</span>
+                                            class="ml-0.5 text-sm font-extrabold">{{ (cond.tickTiming === 'round' ? 'r' : 't') + cond.duration }}</span>
                                         <span v-if="cond.saveRequired" class="ml-0.5 text-xs">💾</span>
                                     </span>
                                 </div>
@@ -364,7 +364,7 @@
                                     <span class="font-bold block mb-1 text-base">
                                         {{ cond.name }} 
                                         <span v-if="cond.saveDC" class="text-sm">(CD {{ cond.saveDC }})</span>
-                                        (T: {{ cond.duration === '∞' ? '∞' : cond.duration }} turnos)
+                                        (Dur: <template v-if="cond.duration === '∞'">∞</template><template v-else>{{ cond.tickTiming === 'round' ? (cond.duration + ' rondas') : (cond.duration + ' turnos') }}</template>)
                                     </span>
                                     <p class="text-left text-gray-300">{{ getConditionTooltip(cond.name) }}</p>
                                     <div v-if="cond.saveRequired" class="mt-2 pt-2 border-t border-gray-600">
@@ -535,6 +535,13 @@
                             <label :for="'dur-' + cond.name" class="text-sm text-gray-300">Duración (Turnos):</label>
                             <input :id="'dur-' + cond.name" type="number" min="1" v-model.number="cond.customDuration"
                                 placeholder="1" class="w-16 p-1 text-sm rounded bg-gray-800 text-center">
+                            <div class="flex items-center gap-2 ml-2">
+                                <label class="text-sm text-gray-300">Tic:</label>
+                                <select v-model="cond.tickTiming" class="bg-gray-800 text-gray-100 text-sm rounded p-1">
+                                    <option value="turn">Inicio de su turno</option>
+                                    <option value="round">Inicio de la ronda</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -844,16 +851,16 @@
 
         // La DB ahora incluye customDuration para la UI del modal
         const initialConditionDB = [
-            { name: "Concentración", icon: "🧠", description: CONDITION_DEFINITIONS["Concentración"], duration: '∞', customDuration: null },
-            { name: "Derribado", icon: "⬇️", description: CONDITION_DEFINITIONS["Derribado"], duration: 1, customDuration: 1 },
-            { name: "Envenenado", icon: "🤢", description: CONDITION_DEFINITIONS["Envenenado"], duration: 1, customDuration: 1 },
-            { name: "Cegado", icon: "🕶️", description: CONDITION_DEFINITIONS["Cegado"], duration: 1, customDuration: 1 },
-            { name: "Hechizado", icon: "💘", description: CONDITION_DEFINITIONS["Hechizado"], duration: 1, customDuration: 1 },
-            { name: "Asustado", icon: "😱", description: CONDITION_DEFINITIONS["Asustado"], duration: 1, customDuration: 1 },
-            { name: "Incapacitado", icon: "😵", description: CONDITION_DEFINITIONS["Incapacitado"], duration: 1, customDuration: 1 },
-            { name: "Paralizado", icon: "🥶", description: CONDITION_DEFINITIONS["Paralizado"], duration: 1, customDuration: 1 },
-            { name: "Aturdido", icon: "💫", description: CONDITION_DEFINITIONS["Aturdido"], duration: 1, customDuration: 1 },
-            { name: "Restringido", icon: "🔗", description: CONDITION_DEFINITIONS["Restringido"], duration: 1, customDuration: 1 },
+            { name: "Concentración", icon: "🧠", description: CONDITION_DEFINITIONS["Concentración"], duration: '∞', customDuration: null, tickTiming: 'turn' },
+            { name: "Derribado", icon: "⬇️", description: CONDITION_DEFINITIONS["Derribado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Envenenado", icon: "🤢", description: CONDITION_DEFINITIONS["Envenenado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Cegado", icon: "🕶️", description: CONDITION_DEFINITIONS["Cegado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Hechizado", icon: "💘", description: CONDITION_DEFINITIONS["Hechizado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Asustado", icon: "😱", description: CONDITION_DEFINITIONS["Asustado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Incapacitado", icon: "😵", description: CONDITION_DEFINITIONS["Incapacitado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Paralizado", icon: "🥶", description: CONDITION_DEFINITIONS["Paralizado"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Aturdido", icon: "💫", description: CONDITION_DEFINITIONS["Aturdido"], duration: 1, customDuration: 1, tickTiming: 'turn' },
+            { name: "Restringido", icon: "🔗", description: CONDITION_DEFINITIONS["Restringido"], duration: 1, customDuration: 1, tickTiming: 'turn' },
         ];
 
         const app = createApp({
@@ -1354,6 +1361,17 @@
                     if (activeCombatantIndex.value >= sortedCombatants.value.length) {
                         activeCombatantIndex.value = 0;
                         round.value++;
+                        // Decrement conditions that tick on round start for ALL combatants
+                        combatants.value.forEach(c => {
+                            if (!c.conditions) return;
+                            c.conditions.forEach(cond => {
+                                if (cond.tickTiming === 'round' && cond.duration && cond.duration !== '∞' && !isNaN(cond.duration) && cond.duration > 0) {
+                                    cond.duration--;
+                                }
+                            });
+                            // Clean up any that hit zero at round start (no confirmation—these usually are global effects)
+                            c.conditions = c.conditions.filter(cond => cond.duration === '∞' || isNaN(cond.duration) || cond.duration > 0 || cond.tickTiming !== 'round');
+                        });
                     }
 
                     // 3. Process start-of-turn effects for the NEW active combatant
@@ -1566,6 +1584,7 @@
                             name: cond.name,
                             icon: cond.icon,
                             duration: durationToApply,
+                            tickTiming: cond.tickTiming || 'turn',
                             saveDC: cond.saveDC,
                             saveRequired: cond.saveRequired,
                             isCustom: cond.isCustom || false
