@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Initiative Tracker - Creación de Webs</title>
+    <!-- Vue.js 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos de Turno Activo */
+        .combatant-active {
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.7);
+            border-left: 4px solid #facc15;
+        }
+
+        /* Ocultar scrollbar */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Smooth scrolling for auto-scroll to active combatant */
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+
+        /* Enhanced active combatant with glow animation */
+        .combatant-active {
+            animation: activeGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes activeGlow {
+            0% { box-shadow: 0 0 15px rgba(255, 255, 0, 0.7), 0 0 30px rgba(255, 255, 0, 0.4); }
+            100% { box-shadow: 0 0 25px rgba(255, 255, 0, 0.9), 0 0 50px rgba(255, 255, 0, 0.6); }
+        }
+
+        /* Better touch targets for mobile */
+        @media (max-width: 768px) {
+            .touch-target {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            .mobile-compact {
+                padding: 0.75rem;
+            }
+            
+            .mobile-text-sm {
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Theme System */
+        .theme-light {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #e2e8f0;
+            --bg-tertiary: #cbd5e1;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-accent: #f59e0b;
+            --border-color: #cbd5e1;
+        }
+
+        .theme-dark {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-accent: #fbbf24;
+            --border-color: #475569;
+        }
+
+        /* Drag and drop styles */
+        .dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .drag-over {
+            border: 2px dashed #fbbf24;
+            background-color: rgba(251, 191, 36, 0.1);
+        }
+
+        /* Enhanced animations */
+        .slide-fade-enter-active, .slide-fade-leave-active {
+            transition: all 0.3s ease;
+        }
+        .slide-fade-enter-from {
+            transform: translateX(-30px);
+            opacity: 0;
+        }
+        .slide-fade-leave-to {
+            transform: translateX(30px);
+            opacity: 0;
+        }
+
+        /* Keyboard focus indicators */
+        .focus-visible:focus {
+            outline: 2px solid #fbbf24;
+            outline-offset: 2px;
+        }
+
+        /* Better button hover effects */
+        .btn-hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Estilo para Tooltip flotante */
+        .custom-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background-color: #374151;
+            /* gray-700 */
+            color: white;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            /* text-sm */
+            white-space: pre-wrap;
+            min-width: 250px;
+            max-width: 350px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 20;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        .group:hover .custom-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-5px);
+        }
+
+        /* Estilo para Toast/Alerta de Mensaje */
+        .toast-enter-active,
+        .toast-leave-active {
+            transition: all 0.5s ease;
+        }
+
+        .toast-enter-from,
+        .toast-leave-to {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div id="app" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+
+        <!-- 
+            ==============================================
+            1. CABECERA: Control de Ronda y Turno
+            ==============================================
+        -->
+        <header class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700 pb-3 mb-4 md:pb-4 md:mb-6">
+            <div class="flex flex-col space-y-3 md:flex-row md:justify-between md:items-center md:space-y-0">
+                <h1 class="text-2xl md:text-3xl font-bold text-yellow-400 text-center md:text-left">⚔️ Tracker de Iniciativa D&D</h1>
+                <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 md:space-x-3 lg:space-x-4">
+                    <span class="text-lg md:text-xl font-semibold">Ronda: <span class="text-yellow-300">{{ round }}</span></span>
+                    
+                    <!-- Turn Timer Display -->
+                    <div v-if="turnTimer.enabled" class="flex items-center space-x-2">
+                        <span class="text-sm font-medium">Tiempo:</span>
+                        <div class="flex items-center space-x-1 px-2 py-1 rounded-lg"
+                            :class="{
+                                'bg-green-800': turnTimer.remaining > turnTimer.duration * 0.5,
+                                'bg-yellow-800': turnTimer.remaining <= turnTimer.duration * 0.5 && turnTimer.remaining > turnTimer.duration * 0.25,
+                                'bg-red-800 animate-pulse': turnTimer.remaining <= turnTimer.duration * 0.25
+                            }">
+                            <span class="text-white font-mono text-sm">{{ formatTime(turnTimer.remaining) }}</span>
+                            <button @click="toggleTimer" class="text-xs hover:text-yellow-300">
+                                {{ turnTimer.running ? '⏸️' : '▶️' }}
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2 sm:gap-2 md:gap-3">
+                        <button @click="nextTurn"
+                            class="touch-target px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 active:bg-green-800 rounded-lg text-white font-semibold transition duration-150 shadow-md text-sm sm:text-base">
+                            Siguiente Turno
+                        </button>
+                        <button @click="resetCombat"
+                            class="touch-target px-3 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-lg text-sm transition duration-150 shadow-md">
+                            Fin de Combate
+                        </button>
+                        <button @click="showDiceRoller"
+                            class="touch-target px-3 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-lg text-sm transition duration-150 shadow-md">
+                            🎲 Dados
+                        </button>
+                        <button @click="showTimerSettings"
+                            class="touch-target px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-lg text-sm transition duration-150 shadow-md btn-hover-lift">
+                            ⏱️ Timer
+                        </button>
+                        <button @click="toggleTheme"
+                            class="touch-target px-3 py-2 bg-gray-600 hover:bg-gray-700 active:bg-gray-800 rounded-lg text-sm transition duration-150 shadow-md btn-hover-lift"
+                            :title="isDarkTheme ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'">
+                            {{ isDarkTheme ? '☀️' : '🌙' }}
+                        </button>
+                        <button @click="showKeyboardShortcuts"
+                            class="touch-target px-3 py-2 bg-gray-600 hover:bg-gray-700 active:bg-gray-800 rounded-lg text-sm transition duration-150 shadow-md btn-hover-lift">
+                            ⌨️
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mobile active combatant indicator -->
+            <div v-if="combatants.length > 0" class="mt-3 md:hidden">
+                <div class="bg-gray-800/80 rounded-lg p-2 text-center">
+                    <span class="text-sm text-gray-400">Turno actual:</span>
+                    <span class="ml-2 text-lg font-bold text-yellow-400">{{ sortedCombatants[activeCombatantIndex].name }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 
+            ==============================================
+            2. LAYOUT PRINCIPAL (Lista + Controles)
+            ==============================================
+        -->
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+
+            <!-- Columna 1: Lista de Iniciativa -->
+            <section id="combatant-list" class="lg:col-span-2 space-y-3 md:space-y-4 scroll-smooth">
+                <h2 class="hidden md:block text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">
+                    Turno: <span class="text-yellow-400 font-bold">{{ combatants.length ?
+                        sortedCombatants[activeCombatantIndex].name : 'Nadie' }}</span>
+                </h2>
+
+                <div v-if="combatants.length === 0" class="text-center py-12 bg-gray-800 rounded-xl shadow-lg">
+                    <p class="text-gray-400 text-xl">Aún no hay combatientes. ¡Añade PJ's o Monstruos para empezar!</p>
+                </div>
+
+                <!-- Lista de Combatientes (v-for) with transitions -->
+                <transition-group name="slide-fade" tag="div" class="space-y-4 md:space-y-6">
+                    <div v-for="(c, index) in sortedCombatants" :key="c.id" :id="'combatant-' + c.id"
+                    :class="{'combatant-active shadow-2xl': index === activeCombatantIndex, 'dragging': c.isDragging, 'drag-over': c.isDragOver}"
+                    class="bg-gray-800 mobile-compact md:p-5 rounded-2xl grid gap-4 md:gap-5 md:grid-cols-12 items-start transition-all duration-300 cursor-move"
+                    :data-index="index"
+                    draggable="true"
+                    @dragstart="startDrag($event, c)"
+                    @dragend="endDrag($event, c)"
+                    @dragover.prevent="dragOver($event, c)"
+                    @dragleave="dragLeave($event, c)"
+                    @drop="drop($event, c)">
+
+                    <!-- 2.1 Info Básica (Nombre, CA, Iniciativa) -->
+                    <div class="w-full md:col-span-3">
+                        <div class="flex items-center justify-between md:block">
+                            <span class="text-base md:text-lg font-bold"
+                                :class="{'text-blue-400': c.isPlayer, 'text-red-400': !c.isPlayer}">{{ c.name }}</span>
+                            <span v-if="index === activeCombatantIndex" class="md:hidden bg-yellow-500 text-gray-900 px-2 py-1 rounded-full text-xs font-bold">
+                                ACTIVO
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-400 space-x-2 mt-1 flex flex-wrap gap-1">
+                            <span class="inline-block px-2 py-1 bg-gray-700 rounded-full">CA: {{ c.ac }}</span>
+                            <span class="inline-block px-2 py-1 bg-gray-700 rounded-full">Init: {{ c.initiative }}</span>
+                        </div>
+                    </div>
+
+                    <!-- 2.2 Control de HP (Barra de Vida) -->
+                    <div class="w-full md:col-span-6">
+                        <div class="relative pt-1">
+                            <div class="flex mb-2 items-center justify-between">
+                                <span class="text-sm font-semibold inline-block py-1 px-2 uppercase rounded-full"
+                                    :class="hpColorClass(c)">
+                                    HP: {{ c.currentHp }}{{ c.tempHp > 0 ? `+${c.tempHp}` : '' }} / {{ c.maxHp }}
+                                </span>
+                                <div v-if="c.currentHp === 0 && c.isPlayer" class="flex space-x-1">
+                                    <button @click="rollDeathSave(c, true)" title="Éxito en salvación de muerte"
+                                        class="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs">
+                                        ✓{{ c.deathSaves.successes }}
+                                    </button>
+                                    <button @click="rollDeathSave(c, false)" title="Fallo en salvación de muerte"
+                                        class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs">
+                                        ✗{{ c.deathSaves.failures }}
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Barra de vida visual con HP temporal -->
+                            <div class="overflow-hidden h-3 mb-4 text-xs flex rounded-full bg-red-900">
+                                <!-- HP actual -->
+                                <div :style="{ width: hpPercentage(c) + '%' }"
+                                    class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500"
+                                    :class="hpBarClass(c)">
+                                </div>
+                                <!-- HP temporal (si existe) -->
+                                <div v-if="c.tempHp > 0" :style="{ width: tempHpPercentage(c) + '%' }"
+                                    class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 bg-blue-400">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Controles Rápidos de HP -->
+                        <div class="flex flex-wrap items-center gap-4 md:gap-6 text-sm py-2">
+                            <input type="number" v-model.number="c.damageInput" placeholder="Cantidad" min="1"
+                                class="touch-target w-28 md:w-36 p-2 rounded bg-gray-700 text-center text-gray-100 focus:ring-yellow-500 focus:border-yellow-500">
+                            <button @click="showDamageRoller(c)" title="Tirar dados de daño/curación"
+                                class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm font-bold transition duration-150">
+                                🎲
+                            </button>
+                            <button @click="adjustHp(c, -c.damageInput)"
+                                :disabled="!c.damageInput || c.damageInput <= 0"
+                                class="touch-target px-4 py-2 bg-red-700 hover:bg-red-800 active:bg-red-900 rounded font-bold disabled:opacity-50 transition duration-150"
+                                title="Restar HP (-)">
+                                -
+                            </button>
+                            <button @click="adjustHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
+                                class="touch-target px-4 py-2 bg-green-700 hover:bg-green-800 active:bg-green-900 rounded font-bold disabled:opacity-50 transition duration-150"
+                                title="Sumar HP (+)">
+                                +
+                            </button>
+                            <button @click="adjustTempHp(c, c.damageInput)" :disabled="!c.damageInput || c.damageInput <= 0"
+                                class="touch-target px-4 py-2 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 rounded font-medium disabled:opacity-50 transition duration-150"
+                                title="Añadir HP Temporal">
+                                Temp
+                            </button>
+                            <button @click="undoHpChange(c)" :disabled="!c.hpHistory || c.hpHistory.length === 0"
+                                class="touch-target px-4 py-2 bg-yellow-700 hover:bg-yellow-800 active:bg-yellow-900 rounded font-medium disabled:opacity-50 transition duration-150"
+                                title="Deshacer último cambio de HP">
+                                ↶
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2.3 Condiciones y Notas -->
+                    <div class="w-full md:col-span-3 mt-2 md:mt-0 space-y-3">
+                        <!-- FILA DE CONDICIONES -->
+                        <div class="flex space-x-1 flex-wrap justify-start items-center gap-1">
+                            <!-- Iconos de Condiciones -->
+                            <div v-for="cond in c.conditions" :key="cond.name + cond.id" 
+                                class="relative group m-0.5 transition duration-150"
+                                :class="{ 'animate-pulse': cond.saveRequired }">
+                                
+                                <!-- Condition Icon with right-click menu -->
+                                <div @click="removeCondition(c, cond.name)" @contextmenu.prevent="showConditionActions(c, cond)"
+                                    class="cursor-pointer hover:scale-110 transition duration-150"
+                                    title="Click: quitar | Click derecho: acciones">
+                                    <span class="inline-block p-1 rounded-full text-xs font-bold leading-none select-none"
+                                        :class="{
+                                            'bg-red-600 text-white': cond.name === 'Concentración', 
+                                            'bg-yellow-600 text-gray-900': cond.name !== 'Concentración',
+                                            'bg-orange-600 text-white': cond.saveRequired,
+                                            'bg-purple-600 text-white': cond.isCustom
+                                        }">
+                                        {{ cond.icon }}
+                                        <span v-if="cond.duration && cond.duration !== '∞'"
+                                            class="ml-0.5 text-sm font-extrabold">{{ cond.duration }}</span>
+                                        <span v-if="cond.saveRequired" class="ml-0.5 text-xs">💾</span>
+                                    </span>
+                                </div>
+
+                                <!-- Tooltip customizado -->
+                                <div class="custom-tooltip">
+                                    <span class="font-bold block mb-1 text-base">
+                                        {{ cond.name }} 
+                                        <span v-if="cond.saveDC" class="text-sm">(CD {{ cond.saveDC }})</span>
+                                        (Dur: {{ cond.duration === '∞' ? 'Especial' : cond.duration + ' Rondas' }})
+                                    </span>
+                                    <p class="text-left text-gray-300">{{ getConditionTooltip(cond.name) }}</p>
+                                    <div v-if="cond.saveRequired" class="mt-2 pt-2 border-t border-gray-600">
+                                        <button @click="rollConditionSave(c, cond)" 
+                                            class="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs">
+                                            Tirar Salvación
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botón para añadir condición -->
+                            <button @click="showConditionModal(c)"
+                                class="p-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white leading-none text-xl transition duration-150 m-0.5"
+                                title="Añadir Condición">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                    fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                        d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- NOTAS y BOTÓN ELIMINAR -->
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                            <input type="text" v-model="c.notes" @input="saveCombatants"
+                                placeholder="Notas (Ej: Carga, Bendecido, etc.)"
+                                class="touch-target flex-grow p-2 sm:p-1 text-sm rounded bg-gray-700 text-gray-100 focus:ring-yellow-500 focus:border-yellow-500">
+                            <button @click="removeCombatant(c.id)"
+                                class="touch-target px-3 py-2 sm:py-1 bg-red-900 hover:bg-red-800 active:bg-red-700 rounded text-xs font-semibold transition duration-150">
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+
+                </transition-group>
+
+            </section>
+
+            <!-- Columna 2: Controles y DB de Condiciones -->
+            <aside class="space-y-6 lg:col-span-1">
+
+                <!-- 3. Formulario para Añadir Combatiente -->
+                <div class="bg-gray-800 p-4 rounded-xl shadow-xl space-y-4">
+                    <h3 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-3">➕ Añadir Combatiente</h3>
+                    <div>
+                        <label for="combatant-name" class="block text-sm font-medium text-gray-300">Nombre</label>
+                        <input id="combatant-name" type="text" v-model="newCombatant.name"
+                            placeholder="Ej: Kael (Guerrero) o Goblin 3"
+                            class="w-full p-2 rounded bg-gray-700 focus:ring-yellow-500 focus:border-yellow-500">
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <!-- INICIATIVA CON TIRADA ALEATORIA -->
+                        <div class="col-span-1">
+                            <label for="combatant-init"
+                                class="block text-sm font-medium text-gray-300">Iniciativa</label>
+                            <div class="flex items-center space-x-2">
+                                <input id="combatant-init" type="number" v-model.number="newCombatant.initiative"
+                                    placeholder="10"
+                                    class="flex-grow p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
+                                    min="0">
+                                <div class="flex space-x-1">
+                                    <button @click="rollInitiative" title="Tirada Rápida de Iniciativa (1d20+10)"
+                                        class="p-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg text-gray-900 font-bold transition duration-150 flex-shrink-0 shadow-md">
+                                        🎲
+                                    </button>
+                                    <button @click="rollInitiativeCustom" title="Tirada Personalizada"
+                                        class="p-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-gray-900 font-bold transition duration-150 flex-shrink-0 shadow-md text-xs">
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- HP MÁX Y CA -->
+                        <div>
+                            <label for="combatant-maxhp" class="block text-sm font-medium text-gray-300">HP Máx.</label>
+                            <input id="combatant-maxhp" type="number" v-model.number="newCombatant.maxHp"
+                                placeholder="35"
+                                class="w-full p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
+                                min="1">
+                        </div>
+                        <div>
+                            <label for="combatant-ac" class="block text-sm font-medium text-gray-300">CA</label>
+                            <input id="combatant-ac" type="number" v-model.number="newCombatant.ac" placeholder="15"
+                                class="w-full p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
+                                min="0">
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 pt-2">
+                        <input type="checkbox" id="isPlayerCheckbox" v-model="newCombatant.isPlayer"
+                            class="h-4 w-4 rounded text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500">
+                        <label for="isPlayerCheckbox" class="text-gray-300 select-none">¿Es un Jugador?</label>
+                    </div>
+                    <button @click="addCombatant"
+                        :disabled="!newCombatant.name || !newCombatant.maxHp || newCombatant.maxHp <= 0"
+                        class="w-full p-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition duration-150 disabled:opacity-50 shadow-md">
+                        Añadir a la Batalla
+                    </button>
+                </div>
+
+                <!-- 4. Base de Datos de Condiciones (Submenú/Acordeón) -->
+                <div class="bg-gray-800 p-4 rounded-xl shadow-xl">
+                    <div class="flex justify-between items-center mb-3">
+                        <button @click="toggleConditionMenu"
+                            class="flex items-center text-xl font-semibold border-b border-gray-700 pb-2 hover:text-yellow-400 transition duration-150">
+                            📚 Base de Condiciones
+                            <span class="text-yellow-400 text-2xl font-bold transition-transform duration-300 ml-2"
+                                :class="{'rotate-180': isConditionMenuOpen}">{{ isConditionMenuOpen ? '▼' : '►' }}</span>
+                        </button>
+                        <button @click="showCustomConditionModal"
+                            class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-semibold transition duration-150">
+                            + Custom
+                        </button>
+                    </div>
+
+                    <!-- Contenido del Submenú (se muestra/oculta completamente) -->
+                    <div v-if="isConditionMenuOpen" class="space-y-3 pt-2 max-h-96 overflow-y-auto hide-scrollbar">
+                        <div v-for="cond in conditionDB" :key="cond.name" class="p-2 bg-gray-700 rounded-lg shadow-sm">
+                            <span class="font-bold block text-base">{{ cond.icon }} {{ cond.name }}</span>
+                            <p class="pt-1 text-sm text-gray-300">{{ cond.description }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Importar/Exportar -->
+                <div class="bg-gray-800 p-4 rounded-xl shadow-xl space-y-3">
+                    <h3 class="text-xl font-semibold border-b border-gray-700 pb-2 mb-3">📥 Exportar / 📤 Importar</h3>
+                    <button @click="exportCombatants"
+                        class="w-full p-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-semibold transition duration-150 shadow-md">
+                        Exportar Lista (JSON)
+                    </button>
+                    <input type="file" @change="importCombatants" accept=".json"
+                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-700 file:text-gray-300 hover:file:bg-gray-600">
+                    <p class="text-xs text-gray-500 pt-2">Los datos se guardan en tu navegador, usa esto para compartir
+                        o hacer copias de seguridad.</p>
+                </div>
+
+            </aside>
+        </main>
+
+        <!-- 
+            ==============================================
+            MODAL DE AÑADIR CONDICIÓN
+            ==============================================
+        -->
+        <div v-if="isConditionModalOpen"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-6 rounded-xl w-full max-w-md shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">Añadir Condición a {{
+                    selectedCombatant ? selectedCombatant.name : '' }}</h3>
+
+                <div class="space-y-3 max-h-96 overflow-y-auto hide-scrollbar">
+                    <div v-for="cond in conditionDB" :key="cond.name"
+                        class="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition duration-150">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-grow">
+                                <span class="font-bold block text-lg">{{ cond.icon }} {{ cond.name }}</span>
+                                <p class="text-xs text-gray-400 mt-1">{{ cond.description }}</p>
+                            </div>
+                            <button @click="applyCondition(cond)"
+                                class="ml-4 px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-full text-sm font-semibold flex-shrink-0">
+                                Aplicar
+                            </button>
+                        </div>
+
+                        <!-- Duración solo para condiciones no permanentes (y no Concentración) -->
+                        <div v-if="cond.name !== 'Concentración'"
+                            class="flex items-center mt-2 space-x-2 border-t border-gray-600 pt-2">
+                            <label :for="'dur-' + cond.name" class="text-sm text-gray-300">Duración (Rondas):</label>
+                            <input :id="'dur-' + cond.name" type="number" min="1" v-model.number="cond.customDuration"
+                                placeholder="1" class="w-16 p-1 text-sm rounded bg-gray-800 text-center">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="isConditionModalOpen = false"
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
+            MODAL DE TIRADA DE DADOS
+            ==============================================
+        -->
+        <div v-if="isDiceRollerOpen"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-6 rounded-xl w-full max-w-lg shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">🎲 Tirador de Dados</h3>
+
+                <!-- Quick Roll Buttons -->
+                <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
+                    <button v-for="die in quickDice" :key="die.sides" 
+                        @click="rollQuickDice(die.sides, die.label)"
+                        class="p-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold transition duration-150 text-sm">
+                        {{ die.label }}
+                    </button>
+                </div>
+
+                <!-- Custom Roll Input -->
+                <div class="space-y-3 mb-4">
+                    <div class="flex space-x-2">
+                        <input type="text" v-model="diceExpression" placeholder="Ej: 2d6+3, 1d20+5"
+                            class="flex-grow p-2 rounded bg-gray-700 text-gray-100 focus:ring-purple-500 focus:border-purple-500">
+                        <button @click="rollCustomDice"
+                            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition duration-150">
+                            Tirar
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400">Ejemplos: 1d20+5, 2d6+3, 3d8, 1d4+2</p>
+                </div>
+
+                <!-- Roll Results -->
+                <div v-if="diceResults.length > 0" class="mb-4 max-h-48 overflow-y-auto">
+                    <h4 class="text-lg font-semibold mb-2">Resultados:</h4>
+                    <div class="space-y-2">
+                        <div v-for="(result, index) in diceResults.slice().reverse()" :key="index"
+                            class="p-2 bg-gray-700 rounded-lg flex justify-between items-center">
+                            <span class="text-sm">{{ result.expression }}</span>
+                            <div class="text-right">
+                                <div class="font-bold text-lg" :class="result.critical ? 'text-yellow-400' : 'text-green-400'">
+                                    {{ result.total }}
+                                </div>
+                                <div class="text-xs text-gray-400">{{ result.details }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-between items-center">
+                    <button @click="clearDiceResults"
+                        class="px-3 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-sm">
+                        Limpiar
+                    </button>
+                    <button @click="isDiceRollerOpen = false"
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
+            MODAL DE CONDICIÓN PERSONALIZADA
+            ==============================================
+        -->
+        <div v-if="isCustomConditionModalOpen"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-6 rounded-xl w-full max-w-md shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">✨ Crear Condición Personalizada</h3>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+                        <input type="text" v-model="customCondition.name" placeholder="Ej: Bendecido, Maldecido"
+                            class="w-full p-2 rounded bg-gray-700 text-gray-100 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Icono/Emoji</label>
+                        <input type="text" v-model="customCondition.icon" placeholder="🌟 ⚡ 🔥 ❄️ etc."
+                            class="w-full p-2 rounded bg-gray-700 text-gray-100 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Descripción</label>
+                        <textarea v-model="customCondition.description" placeholder="Describe el efecto de la condición..."
+                            class="w-full p-2 rounded bg-gray-700 text-gray-100 focus:ring-purple-500 focus:border-purple-500 h-20 resize-none"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Duración (rondas)</label>
+                            <input type="number" v-model.number="customCondition.duration" min="1" placeholder="1"
+                                class="w-full p-2 rounded bg-gray-700 text-gray-100 focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">CD de Salvación</label>
+                            <input type="number" v-model.number="customCondition.saveDC" min="1" placeholder="15"
+                                class="w-full p-2 rounded bg-gray-700 text-gray-100 focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="requiresSave" v-model="customCondition.saveRequired"
+                            class="h-4 w-4 rounded text-purple-500 bg-gray-700 border-gray-600 focus:ring-purple-500">
+                        <label for="requiresSave" class="text-gray-300 select-none">Requiere tirada de salvación cada turno</label>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="isCustomConditionModalOpen = false"
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold">Cancelar</button>
+                    <button @click="createCustomCondition"
+                        :disabled="!customCondition.name || !customCondition.icon"
+                        class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold disabled:opacity-50">
+                        Crear
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
+            MODAL DE CONFIGURACIÓN DE TIMER
+            ==============================================
+        -->
+        <div v-if="isTimerSettingsOpen"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-6 rounded-xl w-full max-w-md shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">⏱️ Configuración de Timer</h3>
+
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="enableTimer" v-model="turnTimer.enabled"
+                            class="h-4 w-4 rounded text-indigo-500 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                        <label for="enableTimer" class="text-gray-300 select-none">Habilitar timer de turno</label>
+                    </div>
+
+                    <div v-if="turnTimer.enabled">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Duración del turno (segundos)</label>
+                        <div class="flex space-x-2">
+                            <button v-for="preset in timerPresets" :key="preset.value"
+                                @click="turnTimer.duration = preset.value"
+                                :class="turnTimer.duration === preset.value ? 'bg-indigo-600' : 'bg-gray-600'"
+                                class="px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition duration-150">
+                                {{ preset.label }}
+                            </button>
+                        </div>
+                        <input type="number" v-model.number="turnTimer.duration" min="10" max="600" 
+                            class="w-full mt-2 p-2 rounded bg-gray-700 text-gray-100 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+
+                    <div v-if="turnTimer.enabled" class="flex items-center space-x-2">
+                        <input type="checkbox" id="autoAdvance" v-model="turnTimer.autoAdvance"
+                            class="h-4 w-4 rounded text-indigo-500 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                        <label for="autoAdvance" class="text-gray-300 select-none">Avanzar turno automáticamente</label>
+                    </div>
+
+                    <div v-if="turnTimer.enabled" class="flex items-center space-x-2">
+                        <input type="checkbox" id="soundAlerts" v-model="turnTimer.soundAlerts"
+                            class="h-4 w-4 rounded text-indigo-500 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                        <label for="soundAlerts" class="text-gray-300 select-none">Alertas sonoras</label>
+                    </div>
+                </div>
+
+                <!-- Combat Speed Analytics -->
+                <div v-if="combatStats.totalTurns > 0" class="mt-6 pt-4 border-t border-gray-700">
+                    <h4 class="text-lg font-semibold mb-2">📊 Estadísticas de Combate</h4>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="bg-gray-700 p-2 rounded">
+                            <div class="text-gray-400">Turnos totales</div>
+                            <div class="font-bold">{{ combatStats.totalTurns }}</div>
+                        </div>
+                        <div class="bg-gray-700 p-2 rounded">
+                            <div class="text-gray-400">Tiempo promedio</div>
+                            <div class="font-bold">{{ formatTime(combatStats.averageTime) }}</div>
+                        </div>
+                        <div class="bg-gray-700 p-2 rounded">
+                            <div class="text-gray-400">Turno más rápido</div>
+                            <div class="font-bold">{{ formatTime(combatStats.fastestTurn) }}</div>
+                        </div>
+                        <div class="bg-gray-700 p-2 rounded">
+                            <div class="text-gray-400">Turno más lento</div>
+                            <div class="font-bold">{{ formatTime(combatStats.slowestTurn) }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="resetCombatStats"
+                        class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm">
+                        Reset Stats
+                    </button>
+                    <button @click="isTimerSettingsOpen = false"
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
+            MODAL DE ATAJOS DE TECLADO
+            ==============================================
+        -->
+        <div v-if="isKeyboardShortcutsOpen"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-6 rounded-xl w-full max-w-lg shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">⌨️ Atajos de Teclado</h3>
+
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                    <div v-for="shortcut in keyboardShortcuts" :key="shortcut.key"
+                        class="flex justify-between items-center p-2 bg-gray-700 rounded-lg">
+                        <span class="text-gray-300">{{ shortcut.description }}</span>
+                        <div class="flex space-x-1">
+                            <kbd v-for="key in shortcut.keys" :key="key"
+                                class="px-2 py-1 bg-gray-600 rounded text-xs font-mono border border-gray-500">
+                                {{ key }}
+                            </kbd>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <button @click="isKeyboardShortcutsOpen = false"
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
+            TOAST / ALERTA DE MENSAJE (CENTRADO EN PANTALLA)
+            ==============================================
+        -->
+        <transition name="toast">
+            <div v-if="messageToast.isVisible" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
+                        p-4 rounded-xl shadow-2xl z-[100] text-center max-w-md 
+                        border-4"
+                :class="messageToast.type === 'error' ? 'bg-red-800 border-red-600' : 'bg-yellow-600 border-yellow-400 text-gray-900'">
+                <p class="font-bold text-xl mb-2">{{ messageToast.title }}</p>
+                <p class="text-base">{{ messageToast.message }}</p>
+                <button v-if="messageToast.type === 'error'" @click="messageToast.isVisible = false"
+                    class="mt-3 text-sm font-semibold text-red-200 hover:text-white">
+                    Entendido
+                </button>
+            </div>
+        </transition>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch, nextTick } = Vue
+
+        // Definiciones de condiciones oficiales (Reglas Básicas de D&D)
+        const CONDITION_DEFINITIONS = {
+            "Concentración": "El lanzador debe hacer una tirada de salvación de Constitución (CD 10 o la mitad del daño, el que sea mayor) cuando recibe daño para mantener el conjuro. (No se decrementa por turno).",
+            "Derribado": "La única opción de movimiento es arrastrarse, a no ser que se levante y gaste la mitad de su velocidad. Desventaja en tiradas de ataque y los ataques contra el objetivo desde 5 pies o menos tienen Ventaja. Los ataques a distancia tienen Desventaja.",
+            "Envenenado": "Tiene Desventaja en tiradas de ataque y tiradas de salvación de habilidad. La condición persiste hasta que la fuente termine.",
+            "Cegado": "Falla automáticamente las pruebas de habilidad que requieren la vista. Tiene Desventaja en tiradas de ataque. Los ataques contra el objetivo tienen Ventaja.",
+            "Hechizado": "El encantador tiene Ventaja en cualquier prueba de habilidad para interactuar socialmente. No puede atacar al encantador ni dirigirle efectos dañinos.",
+            "Asustado": "Tiene Desventaja en tiradas de habilidad y tiradas de ataque mientras esté a la vista de la fuente del miedo.",
+            "Incapacitado": "No puede realizar acciones o reacciones. No se puede mover o hablar. A menudo viene acompañada de otras condiciones.",
+            "Paralizado": "No puede moverse/hablar. Falla automáticamente las salvaciones de Destreza. Los ataques contra él tienen Ventaja. Cualquier ataque cuerpo a cuerpo que impacte a 5 pies es un Crítico automático.",
+            "Aturdido": "No puede moverse, realizar acciones o reacciones. No se beneficia de bonif. de Destreza a la CA. Tiene Desventaja en salvaciones de Fuerza y Destreza.",
+            "Restringido": "Velocidad 0. Tiene Desventaja en tiradas de ataque y salvaciones de Destreza. Los ataques contra la criatura tienen Ventaja.",
+        };
+
+        // La DB ahora incluye customDuration para la UI del modal
+        const initialConditionDB = [
+            { name: "Concentración", icon: "🧠", description: CONDITION_DEFINITIONS["Concentración"], duration: '∞', customDuration: null },
+            { name: "Derribado", icon: "⬇️", description: CONDITION_DEFINITIONS["Derribado"], duration: 1, customDuration: 1 },
+            { name: "Envenenado", icon: "🤢", description: CONDITION_DEFINITIONS["Envenenado"], duration: 1, customDuration: 1 },
+            { name: "Cegado", icon: "🕶️", description: CONDITION_DEFINITIONS["Cegado"], duration: 1, customDuration: 1 },
+            { name: "Hechizado", icon: "💘", description: CONDITION_DEFINITIONS["Hechizado"], duration: 1, customDuration: 1 },
+            { name: "Asustado", icon: "😱", description: CONDITION_DEFINITIONS["Asustado"], duration: 1, customDuration: 1 },
+            { name: "Incapacitado", icon: "😵", description: CONDITION_DEFINITIONS["Incapacitado"], duration: 1, customDuration: 1 },
+            { name: "Paralizado", icon: "🥶", description: CONDITION_DEFINITIONS["Paralizado"], duration: 1, customDuration: 1 },
+            { name: "Aturdido", icon: "💫", description: CONDITION_DEFINITIONS["Aturdido"], duration: 1, customDuration: 1 },
+            { name: "Restringido", icon: "🔗", description: CONDITION_DEFINITIONS["Restringido"], duration: 1, customDuration: 1 },
+        ];
+
+        const app = createApp({
+            setup() {
+                // Estado persistente
+                const combatants = ref(JSON.parse(localStorage.getItem('dnd_combatants')) || []);
+                const round = ref(parseInt(localStorage.getItem('dnd_round')) || 1);
+                const activeCombatantIndex = ref(parseInt(localStorage.getItem('dnd_active_index')) || 0);
+                const nextId = ref(parseInt(localStorage.getItem('dnd_next_id')) || 1);
+
+                // Estado de UI
+                const newCombatant = ref({
+                    name: '', initiative: 0, maxHp: 10, currentHp: 10, ac: 10, isPlayer: false, conditions: [], notes: '', damageInput: null
+                });
+
+                const conditionDB = ref(initialConditionDB);
+                const isConditionModalOpen = ref(false);
+                const selectedCombatant = ref(null);
+                const isConditionMenuOpen = ref(false);
+
+                // Dice Rolling State
+                const isDiceRollerOpen = ref(false);
+                const diceExpression = ref('');
+                const diceResults = ref(JSON.parse(localStorage.getItem('dnd_dice_results')) || []);
+                const quickDice = ref([
+                    { sides: 4, label: 'd4' },
+                    { sides: 6, label: 'd6' },
+                    { sides: 8, label: 'd8' },
+                    { sides: 10, label: 'd10' },
+                    { sides: 12, label: 'd12' },
+                    { sides: 20, label: 'd20' },
+                    { sides: 100, label: 'd100' },
+                    { sides: 20, label: 'Adv', advantage: true }
+                ]);
+
+                // Advanced Condition System State
+                const isCustomConditionModalOpen = ref(false);
+                const customCondition = ref({
+                    name: '',
+                    icon: '',
+                    description: '',
+                    duration: 1,
+                    saveDC: null,
+                    saveRequired: false
+                });
+                const nextConditionId = ref(1);
+
+                // Turn Timer & Combat Speed State
+                const isTimerSettingsOpen = ref(false);
+                const turnTimer = ref({
+                    enabled: false,
+                    duration: 60, // seconds
+                    remaining: 60,
+                    running: false,
+                    autoAdvance: false,
+                    soundAlerts: true,
+                    intervalId: null,
+                    currentTurnStart: null
+                });
+                const timerPresets = ref([
+                    { label: '30s', value: 30 },
+                    { label: '60s', value: 60 },
+                    { label: '90s', value: 90 },
+                    { label: '2min', value: 120 }
+                ]);
+                const combatStats = ref(JSON.parse(localStorage.getItem('dnd_combat_stats')) || {
+                    totalTurns: 0,
+                    totalTime: 0,
+                    turnTimes: [],
+                    fastestTurn: 0,
+                    slowestTurn: 0,
+                    averageTime: 0
+                });
+
+                // UI/UX Enhancement State
+                const isDarkTheme = ref(localStorage.getItem('dnd_theme') !== 'light');
+                const isKeyboardShortcutsOpen = ref(false);
+                const draggedCombatant = ref(null);
+                const keyboardShortcuts = ref([
+                    { description: 'Siguiente turno', keys: ['Space'] },
+                    { description: 'Mostrar dados', keys: ['D'] },
+                    { description: 'Configurar timer', keys: ['T'] },
+                    { description: 'Alternar tema', keys: ['Ctrl', 'Shift', 'T'] },
+                    { description: 'Mostrar atajos', keys: ['?'] },
+                    { description: 'Cerrar modal', keys: ['Esc'] },
+                    { description: 'Enfoque en búsqueda', keys: ['Ctrl', 'F'] }
+                ]);
+
+                // Estado de Alerta (Toast)
+                const messageToast = ref({
+                    isVisible: false,
+                    title: '',
+                    message: '',
+                    type: 'info', // 'info' o 'error'
+                    timeoutId: null
+                });
+
+                // Computadas
+                const sortedCombatants = computed(() => {
+                    // Ordenar por iniciativa (descendente) y luego por un tie-breaker (ID)
+                    return [...combatants.value].sort((a, b) => b.initiative - a.initiative || b.id - a.id);
+                });
+
+                // Watchers para persistencia (localStorage)
+                const saveCombatants = () => {
+                    localStorage.setItem('dnd_combatants', JSON.stringify(combatants.value));
+                    if (activeCombatantIndex.value >= combatants.value.length) {
+                        activeCombatantIndex.value = 0;
+                    }
+                };
+
+                watch(combatants, saveCombatants, { deep: true });
+                watch(round, (newVal) => { localStorage.setItem('dnd_round', newVal); });
+                watch(activeCombatantIndex, (newVal) => { localStorage.setItem('dnd_active_index', newVal); });
+                watch(nextId, (newVal) => { localStorage.setItem('dnd_next_id', newVal); });
+
+                // Métodos
+
+                // Función para mostrar alertas estilizadas (Toast)
+                const showToast = (title, message, type = 'info', duration = 4000) => {
+                    // Limpiar timeout anterior si existe
+                    if (messageToast.value.timeoutId) {
+                        clearTimeout(messageToast.value.timeoutId);
+                    }
+
+                    messageToast.value.title = title;
+                    messageToast.value.message = message;
+                    messageToast.value.type = type;
+                    messageToast.value.isVisible = true;
+
+                    // Ocultar automáticamente después de la duración
+                    messageToast.value.timeoutId = setTimeout(() => {
+                        messageToast.value.isVisible = false;
+                    }, duration);
+                };
+
+                // Dice Rolling Functions
+                const rollDie = (sides) => Math.floor(Math.random() * sides) + 1;
+
+                const parseDiceExpression = (expression) => {
+                    // Parse expressions like "2d6+3", "1d20-1", "3d8"
+                    const regex = /^(\d+)?d(\d+)([+-]\d+)?$/i;
+                    const match = expression.trim().match(regex);
+                    
+                    if (!match) return null;
+                    
+                    const numDice = parseInt(match[1]) || 1;
+                    const sides = parseInt(match[2]);
+                    const modifier = match[3] ? parseInt(match[3]) : 0;
+                    
+                    return { numDice, sides, modifier };
+                };
+
+                const rollDiceExpression = (expression, advantage = false) => {
+                    const parsed = parseDiceExpression(expression);
+                    if (!parsed) {
+                        return { success: false, error: "Expresión de dados inválida" };
+                    }
+
+                    const { numDice, sides, modifier } = parsed;
+                    const rolls = [];
+                    let total = 0;
+
+                    if (advantage && numDice === 1 && sides === 20) {
+                        // Advantage: roll twice, take higher
+                        const roll1 = rollDie(sides);
+                        const roll2 = rollDie(sides);
+                        const higherRoll = Math.max(roll1, roll2);
+                        rolls.push(`${roll1}, ${roll2} (tomando ${higherRoll})`);
+                        total = higherRoll + modifier;
+                    } else {
+                        // Normal roll
+                        for (let i = 0; i < numDice; i++) {
+                            const roll = rollDie(sides);
+                            rolls.push(roll);
+                            total += roll;
+                        }
+                        total += modifier;
+                    }
+
+                    const details = `[${rolls.join(', ')}]${modifier !== 0 ? ` ${modifier >= 0 ? '+' : ''}${modifier}` : ''}`;
+                    const critical = numDice === 1 && sides === 20 && rolls.includes(20);
+
+                    return {
+                        success: true,
+                        total,
+                        details,
+                        critical,
+                        expression: advantage ? `${expression} (Adv)` : expression
+                    };
+                };
+
+                const saveDiceResults = () => {
+                    localStorage.setItem('dnd_dice_results', JSON.stringify(diceResults.value.slice(-50))); // Keep last 50 results
+                };
+
+                const rollQuickDice = (sides, label) => {
+                    const expression = `1d${sides}`;
+                    const advantage = label === 'Adv';
+                    const result = rollDiceExpression(expression, advantage);
+                    
+                    if (result.success) {
+                        diceResults.value.push({
+                            ...result,
+                            timestamp: Date.now(),
+                            expression: advantage ? `1d${sides} (Adv)` : `1d${sides}`
+                        });
+                        saveDiceResults();
+                        showToast("🎲 Tirada", `${label}: ${result.total}`, 'info', 2000);
+                    }
+                };
+
+                const rollCustomDice = () => {
+                    if (!diceExpression.value.trim()) return;
+                    
+                    const result = rollDiceExpression(diceExpression.value);
+                    if (result.success) {
+                        diceResults.value.push({
+                            ...result,
+                            timestamp: Date.now()
+                        });
+                        saveDiceResults();
+                        showToast("🎲 Tirada", `${result.expression}: ${result.total}`, 'info', 2000);
+                        diceExpression.value = '';
+                    } else {
+                        showToast("Error de Dados", result.error, 'error', 3000);
+                    }
+                };
+
+                const clearDiceResults = () => {
+                    diceResults.value = [];
+                    saveDiceResults();
+                };
+
+                const showDiceRoller = () => {
+                    isDiceRollerOpen.value = true;
+                };
+
+                const showDamageRoller = (combatant) => {
+                    selectedCombatant.value = combatant;
+                    diceExpression.value = '1d8'; // Default damage
+                    isDiceRollerOpen.value = true;
+                };
+
+                const rollInitiative = () => {
+                    // Genera un número aleatorio entre 1 y 30 (simulando un D20 + Modificador alto)
+                    const result = rollDiceExpression('1d20+10');
+                    if (result.success) {
+                        newCombatant.value.initiative = result.total;
+                        showToast("🎲 Iniciativa", `Iniciativa: ${result.total} ${result.details}`, 'info', 2000);
+                    }
+                };
+
+                const rollInitiativeCustom = () => {
+                    diceExpression.value = '1d20+';
+                    isDiceRollerOpen.value = true;
+                };
+
+                const addCombatant = () => {
+                    if (newCombatant.value.name && newCombatant.value.maxHp > 0) {
+                        const newC = {
+                            id: nextId.value++,
+                            name: newCombatant.value.name,
+                            // Asegura que la iniciativa sea un número, incluso si no se introdujo nada (por defecto 0 si se usa la caja)
+                            initiative: newCombatant.value.initiative || 0,
+                            maxHp: newCombatant.value.maxHp,
+                            currentHp: newCombatant.value.maxHp,
+                            tempHp: 0,
+                            ac: newCombatant.value.ac || 10,
+                            isPlayer: newCombatant.value.isPlayer,
+                            conditions: [],
+                            notes: '',
+                            damageInput: null,
+                            // Death saves
+                            deathSaves: { successes: 0, failures: 0 },
+                            // Damage resistances/vulnerabilities/immunities
+                            resistances: [],
+                            vulnerabilities: [],
+                            immunities: [],
+                            // HP history for undo
+                            hpHistory: []
+                        };
+                        combatants.value.push(newC);
+
+                        // Resetear el formulario
+                        newCombatant.value = {
+                            name: '', initiative: 0, maxHp: 10, currentHp: 10, ac: 10, isPlayer: false, conditions: [], notes: '', damageInput: null
+                        };
+                    }
+                };
+
+                const removeCombatant = (id) => {
+                    // Usamos una notificación de confirmación en un entorno real. Aquí, usamos confirm temporalmente.
+                    if (!confirm("¿Estás seguro de ELIMINAR a este combatiente?")) return;
+
+                    const indexInCombatants = combatants.value.findIndex(c => c.id === id);
+                    if (indexInCombatants === -1) return;
+
+                    const indexInSorted = sortedCombatants.value.findIndex(c => c.id === id);
+
+                    if (indexInSorted === activeCombatantIndex.value) {
+                        if (sortedCombatants.value.length > 1) {
+                            activeCombatantIndex.value = activeCombatantIndex.value % (sortedCombatants.value.length - 1);
+                        } else {
+                            activeCombatantIndex.value = 0;
+                        }
+                    } else if (indexInSorted < activeCombatantIndex.value) {
+                        activeCombatantIndex.value--;
+                    }
+
+                    combatants.value.splice(indexInCombatants, 1);
+                };
+
+                // Enhanced HP Management Functions
+                const saveHpState = (combatant) => {
+                    if (!combatant.hpHistory) combatant.hpHistory = [];
+                    combatant.hpHistory.push({
+                        currentHp: combatant.currentHp,
+                        tempHp: combatant.tempHp || 0,
+                        timestamp: Date.now()
+                    });
+                    // Keep only last 10 states
+                    if (combatant.hpHistory.length > 10) {
+                        combatant.hpHistory.shift();
+                    }
+                };
+
+                const tempHpPercentage = (c) => {
+                    if (!c.tempHp || c.tempHp <= 0) return 0;
+                    return Math.min((c.tempHp / c.maxHp) * 100, 100 - hpPercentage(c));
+                };
+
+                const adjustHp = (combatant, amount) => {
+                    const c = combatants.value.find(item => item.id === combatant.id);
+                    if (!c || !c.damageInput || c.damageInput <= 0) return;
+
+                    // Ensure combatant has new properties
+                    if (c.tempHp === undefined) c.tempHp = 0;
+                    if (!c.hpHistory) c.hpHistory = [];
+                    if (!c.deathSaves) c.deathSaves = { successes: 0, failures: 0 };
+
+                    // Save current state for undo
+                    saveHpState(c);
+
+                    const actualAmount = amount < 0 ? -c.damageInput : c.damageInput;
+
+                    // Si se está recibiendo DAÑO
+                    if (actualAmount < 0) {
+                        const damageReceived = Math.abs(actualAmount);
+                        let remainingDamage = damageReceived;
+
+                        // First, damage temporary HP
+                        if (c.tempHp > 0) {
+                            const tempDamage = Math.min(c.tempHp, remainingDamage);
+                            c.tempHp -= tempDamage;
+                            remainingDamage -= tempDamage;
+                        }
+
+                        // Then damage actual HP
+                        if (remainingDamage > 0) {
+                            c.currentHp = Math.max(0, c.currentHp - remainingDamage);
+                        }
+
+                        // Check for death (massive damage rule)
+                        if (c.currentHp === 0) {
+                            const massiveDamageThreshold = c.maxHp;
+                            if (damageReceived >= massiveDamageThreshold) {
+                                showToast("💀 DAÑO MASIVO", `${c.name} ha recibido ${damageReceived} de daño. ¡Tirada de salvación de muerte CD 15 o muerte instantánea!`, 'error', 8000);
+                            } else if (c.isPlayer) {
+                                showToast("😵 Inconsciente", `${c.name} ha caído a 0 HP y está inconsciente. Comienzan las tiradas de salvación de muerte.`, 'info', 5000);
+                            } else {
+                                showToast("💀 Muerte", `${c.name} ha caído a 0 HP y muere.`, 'info', 3000);
+                            }
+                        }
+
+                        // 🚨 ALERTA DE CONCENTRACIÓN
+                        const hasConcentration = c.conditions.some(cond => cond.name === 'Concentración');
+                        if (hasConcentration) {
+                            const concentrationDC = Math.max(10, Math.floor(damageReceived / 2));
+                            showToast(
+                                "🚨 ¡TIRADA DE CONCENTRACIÓN!",
+                                `${c.name} ha recibido ${damageReceived} de daño. Debe hacer una tirada de salvación de CON de CD ${concentrationDC} para mantener la Concentración.`,
+                                'info',
+                                7000
+                            );
+                        }
+                    } else {
+                        // CURACIÓN
+                        const healAmount = actualAmount;
+                        const oldHp = c.currentHp;
+                        c.currentHp = Math.min(c.maxHp, c.currentHp + healAmount);
+                        const actualHealing = c.currentHp - oldHp;
+
+                        if (actualHealing > 0) {
+                            showToast("💚 Curación", `${c.name} recupera ${actualHealing} HP.`, 'info', 2000);
+                            
+                            // Reset death saves if healed from 0 HP
+                            if (oldHp === 0 && c.currentHp > 0) {
+                                c.deathSaves = { successes: 0, failures: 0 };
+                                showToast("✨ Revivido", `${c.name} recupera la consciencia.`, 'info', 3000);
+                            }
+                        }
+                    }
+
+                    c.damageInput = null; // Limpiar el input después de aplicar
+                };
+
+                const adjustTempHp = (combatant, amount) => {
+                    const c = combatants.value.find(item => item.id === combatant.id);
+                    if (!c || !c.damageInput || c.damageInput <= 0) return;
+
+                    if (c.tempHp === undefined) c.tempHp = 0;
+                    if (!c.hpHistory) c.hpHistory = [];
+
+                    saveHpState(c);
+
+                    const newTempHp = c.damageInput;
+                    // Temporary HP doesn't stack, take the higher value
+                    if (newTempHp > c.tempHp) {
+                        c.tempHp = newTempHp;
+                        showToast("🛡️ HP Temporal", `${c.name} gana ${newTempHp} HP temporales.`, 'info', 2000);
+                    } else {
+                        showToast("🛡️ HP Temporal", `${c.name} ya tiene ${c.tempHp} HP temporales (mayor que ${newTempHp}).`, 'info', 3000);
+                    }
+
+                    c.damageInput = null;
+                };
+
+                const undoHpChange = (combatant) => {
+                    const c = combatants.value.find(item => item.id === combatant.id);
+                    if (!c || !c.hpHistory || c.hpHistory.length === 0) return;
+
+                    const lastState = c.hpHistory.pop();
+                    c.currentHp = lastState.currentHp;
+                    c.tempHp = lastState.tempHp;
+                    showToast("↶ Deshacer", `Se deshizo el último cambio de HP de ${c.name}.`, 'info', 2000);
+                };
+
+                const rollDeathSave = (combatant, isSuccess) => {
+                    const c = combatants.value.find(item => item.id === combatant.id);
+                    if (!c) return;
+
+                    if (!c.deathSaves) c.deathSaves = { successes: 0, failures: 0 };
+
+                    if (isSuccess) {
+                        c.deathSaves.successes++;
+                        if (c.deathSaves.successes >= 3) {
+                            showToast("✨ Estabilizado", `${c.name} se estabiliza y está inconsciente pero estable.`, 'info', 4000);
+                            c.deathSaves = { successes: 0, failures: 0 };
+                        }
+                    } else {
+                        c.deathSaves.failures++;
+                        if (c.deathSaves.failures >= 3) {
+                            showToast("💀 Muerte", `${c.name} ha fallado 3 salvaciones de muerte y muere.`, 'error', 5000);
+                            c.deathSaves = { successes: 0, failures: 0 };
+                        }
+                    }
+                };
+
+                // Function to scroll to active combatant
+                const scrollToActiveCombatant = () => {
+                    nextTick(() => {
+                        if (sortedCombatants.value.length === 0) return;
+                        
+                        const activeCombatant = sortedCombatants.value[activeCombatantIndex.value];
+                        if (activeCombatant) {
+                            const element = document.getElementById(`combatant-${activeCombatant.id}`);
+                            if (element) {
+                                element.scrollIntoView({ 
+                                    behavior: 'smooth', 
+                                    block: 'center',
+                                    inline: 'nearest' 
+                                });
+                            }
+                        }
+                    });
+                };
+
+                const nextTurn = () => {
+                    if (combatants.value.length === 0) return;
+
+                    // 0. Stop timer and record turn time
+                    if (turnTimer.value.running) {
+                        stopTimer();
+                    }
+
+                    // 1. Aplicar efectos de fin de turno (decremento de duración de condiciones)
+                    const currentCombatant = sortedCombatants.value[activeCombatantIndex.value];
+                    if (currentCombatant) {
+                        // Solo decrementa si la duración NO es '∞'
+                        currentCombatant.conditions = currentCombatant.conditions.filter(cond => {
+                            if (cond.duration && cond.duration !== '∞' && !isNaN(cond.duration) && cond.duration > 0) {
+                                cond.duration--;
+                                // Si la condición expira, se notifica
+                                if (cond.duration === 0) {
+                                    showToast("Condición Expirada", `${currentCombatant.name} ya no está ${cond.name}.`, 'info', 3000);
+                                }
+                                return cond.duration > 0;
+                            }
+                            // Mantiene las condiciones permanentes ('∞') y la concentración (que es '∞')
+                            return true;
+                        });
+                    }
+
+                    // 2. Avanzar el índice activo
+                    activeCombatantIndex.value++;
+
+                    // 3. Comprobar si se completa la ronda
+                    if (activeCombatantIndex.value >= sortedCombatants.value.length) {
+                        activeCombatantIndex.value = 0;
+                        round.value++;
+                    }
+
+                    // 4. Scroll to the new active combatant
+                    scrollToActiveCombatant();
+
+                    // 5. Start timer for new turn
+                    if (turnTimer.value.enabled) {
+                        nextTick(() => {
+                            startTimer();
+                        });
+                    }
+                };
+
+                const resetCombat = () => {
+                    if (confirm('¿Estás seguro de terminar el combate? Se reseteará la ronda, el turno y se eliminarán todas las condiciones.')) {
+                        round.value = 1;
+                        activeCombatantIndex.value = 0;
+                        combatants.value.forEach(c => {
+                            c.conditions = [];
+                            c.currentHp = c.maxHp;
+                            c.notes = '';
+                        });
+                    }
+                };
+
+                // Helpers de HP para la UI
+                const hpPercentage = (c) => (c.currentHp / c.maxHp) * 100;
+
+                const hpBarClass = (c) => {
+                    const percentage = hpPercentage(c);
+                    if (percentage === 0) return 'bg-gray-600';
+                    if (percentage < 25) return 'bg-red-600';
+                    if (percentage < 50) return 'bg-yellow-500';
+                    return 'bg-green-500';
+                };
+
+                const hpColorClass = (c) => {
+                    const percentage = hpPercentage(c);
+                    const hasTemp = c.tempHp && c.tempHp > 0;
+                    
+                    if (percentage === 0) {
+                        return hasTemp ? 'bg-blue-700 text-blue-100' : 'bg-gray-700 text-gray-300';
+                    }
+                    if (c.currentHp >= c.maxHp && hasTemp) return 'bg-blue-800 text-blue-100';
+                    if (c.currentHp >= c.maxHp) return 'bg-blue-800 text-blue-100';
+                    if (percentage < 25) return hasTemp ? 'bg-red-700 text-red-100' : 'bg-red-800 text-red-100';
+                    if (percentage < 50) return hasTemp ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-800 text-yellow-100';
+                    return hasTemp ? 'bg-green-700 text-green-100' : 'bg-green-800 text-green-100';
+                };
+
+                // Métodos de Condiciones
+                const toggleConditionMenu = () => {
+                    isConditionMenuOpen.value = !isConditionMenuOpen.value;
+                };
+
+                const getConditionTooltip = (name) => {
+                    // Devuelve la descripción de la constante
+                    return CONDITION_DEFINITIONS[name] || `No hay descripción mecánica para ${name}.`;
+                };
+
+                const showConditionModal = (combatant) => {
+                    selectedCombatant.value = combatant;
+                    isConditionModalOpen.value = true;
+                    // Resetear duraciones personalizadas en el modal para cada apertura
+                    conditionDB.value.forEach(cond => {
+                        if (cond.duration !== '∞') {
+                            cond.customDuration = 1; // Default a 1 ronda
+                        }
+                    });
+                };
+
+                // Advanced Condition System Functions
+                const showCustomConditionModal = () => {
+                    customCondition.value = {
+                        name: '',
+                        icon: '',
+                        description: '',
+                        duration: 1,
+                        saveDC: null,
+                        saveRequired: false
+                    };
+                    isCustomConditionModalOpen.value = true;
+                };
+
+                const createCustomCondition = () => {
+                    const newCondition = {
+                        name: customCondition.value.name,
+                        icon: customCondition.value.icon,
+                        description: customCondition.value.description,
+                        duration: customCondition.value.duration,
+                        customDuration: customCondition.value.duration,
+                        saveDC: customCondition.value.saveDC,
+                        saveRequired: customCondition.value.saveRequired,
+                        isCustom: true
+                    };
+
+                    // Add to condition database
+                    conditionDB.value.push(newCondition);
+                    
+                    // Save custom conditions to localStorage
+                    const customConditions = conditionDB.value.filter(c => c.isCustom);
+                    localStorage.setItem('dnd_custom_conditions', JSON.stringify(customConditions));
+
+                    showToast("Condición Creada", `Se creó la condición personalizada "${newCondition.name}".`, 'info', 3000);
+                    isCustomConditionModalOpen.value = false;
+                };
+
+                const rollConditionSave = (combatant, condition) => {
+                    if (!condition.saveDC) return;
+
+                    diceExpression.value = '1d20';
+                    isDiceRollerOpen.value = true;
+                    
+                    showToast("💾 Salvación", `${combatant.name} debe tirar 1d20 vs CD ${condition.saveDC} para ${condition.name}.`, 'info', 4000);
+                };
+
+                const showConditionActions = (combatant, condition) => {
+                    // For now, just show save option if applicable
+                    if (condition.saveRequired && condition.saveDC) {
+                        rollConditionSave(combatant, condition);
+                    } else {
+                        removeCondition(combatant, condition.name);
+                    }
+                };
+
+                const applyCondition = (cond) => {
+                    const c = combatants.value.find(item => item.id === selectedCombatant.value.id);
+                    if (c) {
+                        if (c.conditions.some(existing => existing.name === cond.name)) {
+                            // Si ya existe, no hacemos nada
+                            showToast("Condición Duplicada", `${c.name} ya tiene la condición ${cond.name}.`, 'error', 3000);
+                            isConditionModalOpen.value = false;
+                            return;
+                        }
+
+                        let durationToApply = cond.duration;
+                        // Si no es Concentración, usa la duración personalizada si se proporcionó
+                        if (cond.name !== 'Concentración' && cond.customDuration && cond.customDuration > 0) {
+                            durationToApply = cond.customDuration;
+                        } else if (cond.name !== 'Concentración') {
+                            durationToApply = 1; // Por defecto
+                        }
+
+                        const newCondition = {
+                            id: nextConditionId.value++,
+                            name: cond.name,
+                            icon: cond.icon,
+                            duration: durationToApply,
+                            saveDC: cond.saveDC,
+                            saveRequired: cond.saveRequired,
+                            isCustom: cond.isCustom || false
+                        };
+
+                        c.conditions.push(newCondition);
+                        showToast("Condición Aplicada", `${c.name} ahora está ${cond.name}.`, 'info', 3000);
+                    }
+                    isConditionModalOpen.value = false;
+                    selectedCombatant.value = null;
+                };
+
+                const removeCondition = (combatant, conditionName) => {
+                    const c = combatants.value.find(item => item.id === combatant.id);
+                    if (c) {
+                        const conditionToRemove = c.conditions.find(cond => cond.name === conditionName);
+                        c.conditions = c.conditions.filter(cond => cond.name !== conditionName);
+                        showToast("Condición Eliminada", `${c.name} ya no está ${conditionName}.`, 'info', 3000);
+                    }
+                };
+
+                // Load custom conditions from localStorage on startup
+                const loadCustomConditions = () => {
+                    const saved = localStorage.getItem('dnd_custom_conditions');
+                    if (saved) {
+                        try {
+                            const customConditions = JSON.parse(saved);
+                            customConditions.forEach(cond => {
+                                if (!conditionDB.value.some(existing => existing.name === cond.name)) {
+                                    conditionDB.value.push(cond);
+                                }
+                            });
+                        } catch (e) {
+                            console.error('Error loading custom conditions:', e);
+                        }
+                    }
+                };
+
+                // Initialize custom conditions
+                loadCustomConditions();
+
+                // Turn Timer & Combat Speed Functions
+                const formatTime = (seconds) => {
+                    if (seconds <= 0) return '0:00';
+                    const mins = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
+
+                const showTimerSettings = () => {
+                    isTimerSettingsOpen.value = true;
+                };
+
+                const startTimer = () => {
+                    if (!turnTimer.value.enabled) return;
+                    
+                    turnTimer.value.running = true;
+                    turnTimer.value.remaining = turnTimer.value.duration;
+                    turnTimer.value.currentTurnStart = Date.now();
+                    
+                    turnTimer.value.intervalId = setInterval(() => {
+                        turnTimer.value.remaining--;
+                        
+                        // Sound alerts
+                        if (turnTimer.value.soundAlerts) {
+                            if (turnTimer.value.remaining === 10) {
+                                playSound('warning'); // 10 seconds warning
+                            } else if (turnTimer.value.remaining === 0) {
+                                playSound('timeup'); // Time's up
+                            }
+                        }
+                        
+                        // Auto advance
+                        if (turnTimer.value.remaining <= 0) {
+                            if (turnTimer.value.autoAdvance) {
+                                nextTurn();
+                            } else {
+                                stopTimer();
+                                showToast("⏰ Tiempo Agotado", "El tiempo del turno ha terminado.", 'info', 3000);
+                            }
+                        }
+                    }, 1000);
+                };
+
+                const stopTimer = () => {
+                    turnTimer.value.running = false;
+                    if (turnTimer.value.intervalId) {
+                        clearInterval(turnTimer.value.intervalId);
+                        turnTimer.value.intervalId = null;
+                    }
+                    
+                    // Record turn time for stats
+                    if (turnTimer.value.currentTurnStart && combatants.value.length > 0) {
+                        const turnTime = Math.round((Date.now() - turnTimer.value.currentTurnStart) / 1000);
+                        recordTurnTime(turnTime);
+                    }
+                };
+
+                const toggleTimer = () => {
+                    if (turnTimer.value.running) {
+                        stopTimer();
+                    } else {
+                        startTimer();
+                    }
+                };
+
+                const recordTurnTime = (time) => {
+                    combatStats.value.totalTurns++;
+                    combatStats.value.totalTime += time;
+                    combatStats.value.turnTimes.push(time);
+                    
+                    // Keep only last 100 turn times
+                    if (combatStats.value.turnTimes.length > 100) {
+                        const removed = combatStats.value.turnTimes.shift();
+                        combatStats.value.totalTime -= removed;
+                        combatStats.value.totalTurns--;
+                    }
+                    
+                    // Calculate stats
+                    combatStats.value.averageTime = Math.round(combatStats.value.totalTime / combatStats.value.totalTurns);
+                    combatStats.value.fastestTurn = Math.min(...combatStats.value.turnTimes);
+                    combatStats.value.slowestTurn = Math.max(...combatStats.value.turnTimes);
+                    
+                    // Save to localStorage
+                    localStorage.setItem('dnd_combat_stats', JSON.stringify(combatStats.value));
+                };
+
+                const resetCombatStats = () => {
+                    combatStats.value = {
+                        totalTurns: 0,
+                        totalTime: 0,
+                        turnTimes: [],
+                        fastestTurn: 0,
+                        slowestTurn: 0,
+                        averageTime: 0
+                    };
+                    localStorage.setItem('dnd_combat_stats', JSON.stringify(combatStats.value));
+                    showToast("📊 Stats Reset", "Las estadísticas de combate han sido reiniciadas.", 'info', 2000);
+                };
+
+                const playSound = (type) => {
+                    if (!turnTimer.value.soundAlerts) return;
+                    
+                    // Create audio context for sound effects
+                    try {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        if (type === 'warning') {
+                            oscillator.frequency.value = 800;
+                            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.2);
+                        } else if (type === 'timeup') {
+                            oscillator.frequency.value = 400;
+                            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 1);
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 1);
+                        }
+                    } catch (e) {
+                        console.log('Audio not supported:', e);
+                    }
+                };
+
+                // UI/UX Enhancement Functions
+                const toggleTheme = () => {
+                    isDarkTheme.value = !isDarkTheme.value;
+                    localStorage.setItem('dnd_theme', isDarkTheme.value ? 'dark' : 'light');
+                    document.body.classList.toggle('theme-light', !isDarkTheme.value);
+                    document.body.classList.toggle('theme-dark', isDarkTheme.value);
+                    showToast("🎨 Tema", `Tema ${isDarkTheme.value ? 'oscuro' : 'claro'} activado.`, 'info', 2000);
+                };
+
+                const showKeyboardShortcuts = () => {
+                    isKeyboardShortcutsOpen.value = true;
+                };
+
+                // Drag and Drop Functions
+                const startDrag = (event, combatant) => {
+                    draggedCombatant.value = combatant;
+                    combatant.isDragging = true;
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/html', event.target.outerHTML);
+                };
+
+                const endDrag = (event, combatant) => {
+                    combatant.isDragging = false;
+                    draggedCombatant.value = null;
+                };
+
+                const dragOver = (event, combatant) => {
+                    if (draggedCombatant.value && draggedCombatant.value.id !== combatant.id) {
+                        combatant.isDragOver = true;
+                    }
+                };
+
+                const dragLeave = (event, combatant) => {
+                    combatant.isDragOver = false;
+                };
+
+                const drop = (event, targetCombatant) => {
+                    event.preventDefault();
+                    if (!draggedCombatant.value || draggedCombatant.value.id === targetCombatant.id) return;
+
+                    // Reorder initiative values
+                    const draggedIndex = combatants.value.findIndex(c => c.id === draggedCombatant.value.id);
+                    const targetIndex = combatants.value.findIndex(c => c.id === targetCombatant.id);
+                    
+                    if (draggedIndex !== -1 && targetIndex !== -1) {
+                        // Swap initiative values
+                        const tempInitiative = combatants.value[draggedIndex].initiative;
+                        combatants.value[draggedIndex].initiative = combatants.value[targetIndex].initiative;
+                        combatants.value[targetIndex].initiative = tempInitiative;
+                        
+                        showToast("🔄 Reordenado", `${draggedCombatant.value.name} reordenado en la iniciativa.`, 'info', 2000);
+                    }
+
+                    // Clear drag states
+                    combatants.value.forEach(c => {
+                        c.isDragging = false;
+                        c.isDragOver = false;
+                    });
+                    draggedCombatant.value = null;
+                };
+
+                // Keyboard Shortcuts Handler
+                const handleKeydown = (event) => {
+                    // Don't trigger shortcuts when typing in inputs
+                    if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
+
+                    switch (event.key) {
+                        case ' ': // Space - Next turn
+                            event.preventDefault();
+                            nextTurn();
+                            break;
+                        case 'd':
+                        case 'D':
+                            event.preventDefault();
+                            showDiceRoller();
+                            break;
+                        case 't':
+                        case 'T':
+                            event.preventDefault();
+                            showTimerSettings();
+                            break;
+                        case '?':
+                            event.preventDefault();
+                            showKeyboardShortcuts();
+                            break;
+                        case 'Escape':
+                            // Close any open modals
+                            isDiceRollerOpen.value = false;
+                            isConditionModalOpen.value = false;
+                            isCustomConditionModalOpen.value = false;
+                            isTimerSettingsOpen.value = false;
+                            isKeyboardShortcutsOpen.value = false;
+                            break;
+                    }
+
+                    // Ctrl+Shift+T - Toggle theme
+                    if (event.ctrlKey && event.shiftKey && event.key === 'T') {
+                        event.preventDefault();
+                        toggleTheme();
+                    }
+                };
+
+                // Initialize theme
+                const initializeTheme = () => {
+                    document.body.classList.toggle('theme-light', !isDarkTheme.value);
+                    document.body.classList.toggle('theme-dark', isDarkTheme.value);
+                };
+
+                // Add keyboard event listener
+                document.addEventListener('keydown', handleKeydown);
+
+                // Initialize theme on load
+                initializeTheme();
+
+                // Importar/Exportar
+                const exportCombatants = () => {
+                    const exportableList = combatants.value.map(c => {
+                        const { damageInput, ...rest } = c; // Excluir propiedad temporal de UI
+                        return rest;
+                    });
+
+                    const dataStr = JSON.stringify(exportableList, null, 2);
+                    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+                    const linkElement = document.createElement('a');
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', 'dnd_combat_list_export.json');
+                    document.body.appendChild(linkElement);
+                    linkElement.click();
+                    document.body.removeChild(linkElement);
+                };
+
+                const importCombatants = (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const importedList = JSON.parse(e.target.result);
+                            if (Array.isArray(importedList)) {
+                                const newCombatants = importedList.map(item => ({
+                                    id: nextId.value++,
+                                    name: item.name || 'Sin Nombre',
+                                    initiative: item.initiative || 0,
+                                    maxHp: item.maxHp || 10,
+                                    currentHp: item.currentHp || item.maxHp || 10,
+                                    ac: item.ac || 10,
+                                    isPlayer: item.isPlayer || false,
+                                    conditions: item.conditions || [],
+                                    notes: item.notes || '',
+                                    damageInput: null
+                                }));
+
+                                combatants.value = combatants.value.concat(newCombatants);
+                                showToast("Importación Exitosa", `Se han añadido ${newCombatants.length} combatientes a la lista.`, 'info', 3000);
+                            } else {
+                                showToast("Error de Importación", 'El archivo JSON debe contener un array de combatientes. Verifica el formato.', 'error', 5000);
+                            }
+                        } catch (error) {
+                            showToast("Error de Archivo", 'Error al parsear el archivo JSON. Asegúrate de que no esté corrupto.', 'error', 5000);
+                        }
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file);
+                };
+
+                // Watch for changes to active combatant and scroll on first load
+                watch(activeCombatantIndex, () => {
+                    if (combatants.value.length > 0) {
+                        scrollToActiveCombatant();
+                    }
+                });
+
+                // Watch for changes to combatants list to scroll to active when new combatants are added
+                watch(combatants, (newCombatants, oldCombatants) => {
+                    if (newCombatants.length > oldCombatants.length && newCombatants.length > 0) {
+                        nextTick(() => {
+                            scrollToActiveCombatant();
+                        });
+                    }
+                    
+                    // Ensure all combatants have drag properties
+                    newCombatants.forEach(c => {
+                        if (c.isDragging === undefined) c.isDragging = false;
+                        if (c.isDragOver === undefined) c.isDragOver = false;
+                    });
+                }, { deep: true });
+
+                return {
+                    combatants, round, activeCombatantIndex, newCombatant, sortedCombatants,
+                    conditionDB, isConditionModalOpen, selectedCombatant, isConditionMenuOpen, saveCombatants,
+                    messageToast, showToast, // Exportar Toast
+
+                    // Dice Rolling
+                    isDiceRollerOpen, diceExpression, diceResults, quickDice,
+                    rollQuickDice, rollCustomDice, clearDiceResults, showDiceRoller, showDamageRoller,
+
+                    rollInitiative, rollInitiativeCustom, addCombatant, removeCombatant, adjustHp, nextTurn, resetCombat,
+                    hpPercentage, hpBarClass, hpColorClass, tempHpPercentage, adjustTempHp, undoHpChange, rollDeathSave, scrollToActiveCombatant,
+                    toggleConditionMenu, getConditionTooltip, showConditionModal, applyCondition, removeCondition,
+                    // Advanced Conditions
+                    isCustomConditionModalOpen, customCondition, showCustomConditionModal, createCustomCondition,
+                    rollConditionSave, showConditionActions,
+                    // Turn Timer
+                    isTimerSettingsOpen, turnTimer, timerPresets, combatStats,
+                    formatTime, showTimerSettings, toggleTimer, resetCombatStats,
+                    // UI/UX Enhancements
+                    isDarkTheme, isKeyboardShortcutsOpen, keyboardShortcuts,
+                    toggleTheme, showKeyboardShortcuts, startDrag, endDrag, dragOver, dragLeave, drop,
+                    exportCombatants, importCombatants
+                }
+            }
+        })
+
+        app.mount('#app')
+    </script>
+</body>
+
+</html>
