@@ -1446,14 +1446,13 @@
                 };
 
                 const resetCombat = () => {
-                    if (confirm('¿Estás seguro de terminar el combate? Se reseteará la ronda, el turno y se eliminarán todas las condiciones.')) {
+                    if (confirm('¿Estás seguro de terminar el combate? Se eliminará todo: combatientes, ronda y turnos.')) {
                         round.value = 1;
                         activeCombatantIndex.value = 0;
-                        combatants.value.forEach(c => {
-                            c.conditions = [];
-                            c.currentHp = c.maxHp;
-                            c.notes = '';
-                        });
+                        combatants.value = [];
+                        // Clear localStorage so data doesn't persist
+                        localStorage.setItem('dnd_combatants', JSON.stringify([]));
+                        showToast("Combate Finalizado", "Todos los combatientes han sido eliminados.", 'info', 3000);
                     }
                 };
 
