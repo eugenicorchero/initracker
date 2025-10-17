@@ -787,6 +787,81 @@
 
         <!-- 
             ==============================================
+            MODAL DE IMPORTAR COMBATIENTES
+            ==============================================
+        -->
+        <div v-if="isImportModalOpen"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 p-6 rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">📤 Importar Combatientes</h3>
+                
+                <p class="text-sm text-gray-400 mb-4">Selecciona los combatientes que quieres añadir y ajusta su iniciativa:</p>
+                
+                <!-- List of combatants to import -->
+                <div class="space-y-2 overflow-y-auto flex-grow mb-4">
+                    <div v-for="(c, index) in importPreview" :key="index"
+                        @click="c.selected = !c.selected"
+                        class="p-3 rounded-lg cursor-pointer transition duration-150 flex items-center gap-3"
+                        :class="c.selected ? 'bg-blue-700 hover:bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'">
+                        
+                        <!-- Checkbox visual -->
+                        <div class="flex-shrink-0">
+                            <div class="w-6 h-6 rounded border-2 flex items-center justify-center"
+                                :class="c.selected ? 'bg-blue-500 border-blue-500' : 'bg-gray-600 border-gray-500'">
+                                <svg v-if="c.selected" class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- Combatant info -->
+                        <div class="flex-grow">
+                            <div class="font-bold" :class="c.isPlayer ? 'text-blue-300' : 'text-red-300'">
+                                {{ c.name }}
+                            </div>
+                            <div class="text-xs text-gray-400">
+                                HP: {{ c.maxHp }} | CA: {{ c.ac }}
+                            </div>
+                        </div>
+                        
+                        <!-- Initiative input -->
+                        <div class="flex items-center gap-2" @click.stop>
+                            <label class="text-sm text-gray-300">Init:</label>
+                            <input type="number" v-model.number="c.editableInitiative" 
+                                class="w-16 p-1 rounded bg-gray-900 text-center text-gray-100 focus:ring-yellow-500 focus:border-yellow-500"
+                                min="0"
+                                @click.stop>
+                            <button @click.stop="c.editableInitiative = Math.floor(Math.random() * 20) + 1" 
+                                title="Tirar 1d20"
+                                class="w-8 h-8 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 rounded text-sm font-bold transition duration-150">
+                                🎲
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex justify-between items-center pt-4 border-t border-gray-700">
+                    <div class="text-sm text-gray-400">
+                        {{ importPreview.filter(c => c.selected).length }} de {{ importPreview.length }} seleccionados
+                    </div>
+                    <div class="flex gap-3">
+                        <button @click="cancelImport"
+                            class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold">
+                            Cancelar
+                        </button>
+                        <button @click="confirmImport"
+                            :disabled="importPreview.filter(c => c.selected).length === 0"
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold disabled:opacity-50">
+                            Importar Seleccionados
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            ==============================================
             POPUP: CONFIRMAR CONDICIÓN EXPIRADA
             ==============================================
         -->
@@ -951,6 +1026,10 @@
                     { description: 'Cerrar modal', keys: ['Esc'] },
                     { description: 'Enfoque en búsqueda', keys: ['Ctrl', 'F'] }
                 ]);
+
+                // Import modal state
+                const isImportModalOpen = ref(false);
+                const importPreview = ref([]);
 
                 // Estado de Alerta (Toast)
                 const messageToast = ref({
@@ -1891,8 +1970,8 @@
                         try {
                             const importedList = JSON.parse(e.target.result);
                             if (Array.isArray(importedList)) {
-                                const newCombatants = importedList.map(item => ({
-                                    id: nextId.value++,
+                                // Populate preview with all combatants selected by default
+                                importPreview.value = importedList.map(item => ({
                                     name: item.name || 'Sin Nombre',
                                     initiative: item.initiative || 0,
                                     maxHp: item.maxHp || 10,
@@ -1901,13 +1980,12 @@
                                     isPlayer: item.isPlayer || false,
                                     conditions: item.conditions || [],
                                     notes: item.notes || '',
-                                    damageInput: null
+                                    selected: true,
+                                    editableInitiative: item.initiative || 0
                                 }));
-
-                                combatants.value = combatants.value.concat(newCombatants);
-                                showToast("Importación Exitosa", `Se han añadido ${newCombatants.length} combatientes a la lista.`, 'info', 3000);
+                                isImportModalOpen.value = true;
                             } else {
-                                showToast("Error de Importación", 'El archivo JSON debe contener un array de combatientes. Verifica el formato.', 'error', 5000);
+                                showToast("Error de Importación", 'El archivo JSON debe contener un array de combatantes. Verifica el formato.', 'error', 5000);
                             }
                         } catch (error) {
                             showToast("Error de Archivo", 'Error al parsear el archivo JSON. Asegúrate de que no esté corrupto.', 'error', 5000);
@@ -1915,6 +1993,35 @@
                         event.target.value = '';
                     };
                     reader.readAsText(file);
+                };
+
+                const confirmImport = () => {
+                    const selectedCombatants = importPreview.value
+                        .filter(c => c.selected)
+                        .map(c => ({
+                            id: nextId.value++,
+                            name: c.name,
+                            initiative: c.editableInitiative,
+                            maxHp: c.maxHp,
+                            currentHp: c.currentHp,
+                            ac: c.ac,
+                            isPlayer: c.isPlayer,
+                            conditions: c.conditions,
+                            notes: c.notes,
+                            damageInput: null
+                        }));
+                    
+                    combatants.value = combatants.value.concat(selectedCombatants);
+                    showToast("Importación Exitosa", `Se han añadido ${selectedCombatants.length} combatientes a la lista.`, 'info', 3000);
+                    
+                    // Close modal and clear preview
+                    isImportModalOpen.value = false;
+                    importPreview.value = [];
+                };
+
+                const cancelImport = () => {
+                    isImportModalOpen.value = false;
+                    importPreview.value = [];
                 };
 
                 // Watch for changes to active combatant and scroll on first load
@@ -1960,7 +2067,9 @@
                     // UI/UX Enhancements
                     isDarkTheme, isKeyboardShortcutsOpen, keyboardShortcuts,
                     toggleTheme, showKeyboardShortcuts, startDrag, endDrag, dragOver, dragLeave, drop,
-                    exportCombatants, importCombatants,
+                    exportCombatants, importCombatants, confirmImport, cancelImport,
+                    // Import modal
+                    isImportModalOpen, importPreview,
                     // Expiring condition popup
                     expiringConditionPopup, handleExpiringCondition
                 }
