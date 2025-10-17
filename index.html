@@ -423,18 +423,14 @@
                     <div class="flex flex-row gap-2 mt-2">
                         <div class="flex flex-col gap-1 w-1/3">
                             <label for="combatant-init" class="block text-sm font-medium text-gray-300">Iniciativa</label>
-                            <div class="flex gap-1">
+                            <div class="flex gap-2">
                                 <input id="combatant-init" type="number" v-model.number="newCombatant.initiative"
                                     placeholder="10"
                                     class="w-full p-2 rounded bg-gray-700 text-center focus:ring-yellow-500 focus:border-yellow-500"
                                     min="0">
-                                <button @click="rollInitiative" title="Tirar iniciativa (1d20+10)"
-                                    class="w-8 h-8 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 rounded-full text-base font-bold transition duration-150 shadow-md">
+                                <button @click="rollInitiative" title="Tirar iniciativa (1d20)"
+                                    class="w-10 h-10 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 rounded-lg text-lg font-bold transition duration-150 shadow-md">
                                     🎲
-                                </button>
-                                <button @click="rollInitiativeCustom" title="Tirada personalizada"
-                                    class="w-8 h-8 flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 rounded-full text-base font-bold transition duration-150 shadow-md">
-                                    +
                                 </button>
                             </div>
                         </div>
@@ -1113,8 +1109,8 @@
                 };
 
                 const rollInitiative = () => {
-                    // Genera un número aleatorio entre 1 y 30 (simulando un D20 + Modificador alto)
-                    const result = rollDiceExpression('1d20+10');
+                    // Simple 1d20 roll
+                    const result = rollDiceExpression('1d20');
                     if (result.success) {
                         newCombatant.value.initiative = result.total;
                         showToast("🎲 Iniciativa", `Iniciativa: ${result.total} ${result.details}`, 'info', 2000);
